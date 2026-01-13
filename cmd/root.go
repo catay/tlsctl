@@ -74,16 +74,24 @@ func validateEndpoint(endpoint string) error {
 	return nil
 }
 
-func outputJSON(info *tlsquery.CertInfo) error {
+func outputJSON(chain *tlsquery.ChainInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(info)
+	return encoder.Encode(chain)
 }
 
-func outputText(info *tlsquery.CertInfo) {
-	fmt.Printf("Common Name:           %s\n", info.CommonName)
-	fmt.Printf("Issuer:                %s\n", info.Issuer)
-	fmt.Printf("Valid From:            %s\n", info.NotBefore)
-	fmt.Printf("Valid Until:           %s\n", info.NotAfter)
-	fmt.Printf("Subject Alt Names:     %s\n", strings.Join(info.SubjectAltNames, ", "))
+func outputText(chain *tlsquery.ChainInfo) {
+	for i, cert := range chain.Certificates {
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Printf("[%s]\n", strings.ToUpper(cert.Type))
+		fmt.Printf("Common Name:           %s\n", cert.CommonName)
+		fmt.Printf("Issuer:                %s\n", cert.Issuer)
+		fmt.Printf("Valid From:            %s\n", cert.NotBefore)
+		fmt.Printf("Valid Until:           %s\n", cert.NotAfter)
+		if len(cert.SubjectAltNames) > 0 {
+			fmt.Printf("Subject Alt Names:     %s\n", strings.Join(cert.SubjectAltNames, ", "))
+		}
+	}
 }

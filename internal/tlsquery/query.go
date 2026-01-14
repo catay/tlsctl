@@ -22,11 +22,16 @@ type ChainInfo struct {
 	Certificates []CertInfo `json:"certificates"`
 }
 
+// TLSConfig allows customizing the TLS configuration for testing.
+var TLSConfig *tls.Config
+
 // Query connects to the given endpoint and retrieves certificate chain information.
 func Query(endpoint string) (*ChainInfo, error) {
-	conn, err := tls.Dial("tcp", endpoint, &tls.Config{
-		InsecureSkipVerify: false,
-	})
+	config := TLSConfig
+	if config == nil {
+		config = &tls.Config{}
+	}
+	conn, err := tls.Dial("tcp", endpoint, config)
 	if err != nil {
 		return nil, fmt.Errorf("TLS handshake failed: %w", err)
 	}

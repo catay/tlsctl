@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/tlsq/internal/tlsquery"
+	"github.com/tlsctl/internal/tlsquery"
 )
 
 var jsonOutput bool
 
 var rootCmd = &cobra.Command{
-	Use:   "tlsq FQDN:PORT",
+	Use:   "tlsctl FQDN:PORT",
 	Short: "Query TLS certificate information for a given endpoint",
-	Long:  `tlsq connects to a TLS endpoint and displays certificate metadata including CN, Issuer, validity dates, and SANs.`,
+	Long:  `tlsctl connects to a TLS endpoint and displays certificate metadata including CN, Issuer, validity dates, and SANs.`,
 	Args:  cobra.ExactArgs(1),
 	RunE:  run,
 }

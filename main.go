@@ -1,6 +1,6 @@
 package main
 
-import "github.com/tlsq/cmd"
+import "github.com/tlsctl/cmd"
 
 func main() {
 	cmd.Execute()

@@ -1,4 +1,4 @@
-module github.com/tlsq
+module github.com/tlsctl
 
 go 1.21
 

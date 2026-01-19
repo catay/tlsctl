@@ -1,21 +1,21 @@
-# tlsq
+# tlsctl
 
 A command-line tool to query TLS certificate information.
 
 ## Installation
 
 ```bash
-go build -o tlsq .
+go build -o tlsctl .
 ```
 
 ## Usage
 
 ```bash
 # Human-readable output
-tlsq google.com:443
+tlsctl google.com:443
 
 # JSON output
-tlsq --json example.com:443
+tlsctl --json example.com:443
 ```
 
 ## Example Output

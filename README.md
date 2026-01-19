@@ -11,11 +11,14 @@ go build -o tlsctl .
 ## Usage
 
 ```bash
-# Human-readable output
-tlsctl google.com:443
+# Human-readable output (port defaults to 443)
+tlsctl google.com
+
+# With explicit port
+tlsctl google.com:8443
 
 # JSON output
-tlsctl --json example.com:443
+tlsctl --json example.com
 ```
 
 ## Example Output

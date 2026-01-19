@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,9 +14,9 @@ import (
 var jsonOutput bool
 
 var rootCmd = &cobra.Command{
-	Use:   "tlsctl FQDN:PORT",
+	Use:   "tlsctl FQDN[:PORT]",
 	Short: "Query TLS certificate information for a given endpoint",
-	Long:  `tlsctl connects to a TLS endpoint and displays certificate metadata including CN, Issuer, validity dates, and SANs.`,
+	Long:  `tlsctl connects to a TLS endpoint and displays certificate metadata including CN, Issuer, validity dates, and SANs. Port defaults to 443 if not specified.`,
 	Args:  cobra.ExactArgs(1),
 	RunE:  run,
 }
@@ -31,9 +32,8 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	endpoint := args[0]
-
-	if err := validateEndpoint(endpoint); err != nil {
+	endpoint, err := normalizeEndpoint(args[0])
+	if err != nil {
 		return err
 	}
 
@@ -49,29 +49,27 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func validateEndpoint(endpoint string) error {
+func normalizeEndpoint(endpoint string) (string, error) {
 	parts := strings.Split(endpoint, ":")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid endpoint format: expected FQDN:PORT, got %q", endpoint)
+	if len(parts) > 2 {
+		return "", fmt.Errorf("invalid endpoint format: expected FQDN[:PORT], got %q", endpoint)
 	}
 
-	host, port := parts[0], parts[1]
-
+	host := parts[0]
 	if host == "" {
-		return fmt.Errorf("invalid hostname: hostname cannot be empty")
+		return "", fmt.Errorf("invalid hostname: hostname cannot be empty")
 	}
 
-	if port == "" {
-		return fmt.Errorf("invalid port: port cannot be empty")
-	}
-
-	for _, c := range port {
-		if c < '0' || c > '9' {
-			return fmt.Errorf("invalid port: %q is not a valid port number", port)
+	port := "443"
+	if len(parts) == 2 && parts[1] != "" {
+		port = parts[1]
+		portNum, err := strconv.Atoi(port)
+		if err != nil || portNum < 0 || portNum > 65535 {
+			return "", fmt.Errorf("invalid port: port must be a number in the range 0-65535")
 		}
 	}
 
-	return nil
+	return host + ":" + port, nil
 }
 
 func outputJSON(chain *tlsquery.ChainInfo) error {

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"encoding/json"
+
+	"gopkg.in/yaml.v3"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,7 +13,7 @@ import (
 	"github.com/tlsctl/internal/tlsquery"
 )
 
-var jsonOutput bool
+var outputFormat string
 
 var clientCmd = &cobra.Command{
 	Use:   "client FQDN[:PORT]",
@@ -23,7 +25,7 @@ var clientCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(clientCmd)
-	clientCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	clientCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "Output format (text, json, yaml)")
 }
 
 func runClient(cmd *cobra.Command, args []string) error {
@@ -37,11 +39,17 @@ func runClient(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
+	switch outputFormat {
+	case "json":
 		return outputJSON(certInfo)
+	case "yaml":
+		return outputYAML(certInfo)
+	case "text":
+		outputText(certInfo)
+		return nil
+	default:
+		return fmt.Errorf("invalid output format: %q (valid: text, json, yaml)", outputFormat)
 	}
-	outputText(certInfo)
-	return nil
 }
 
 func normalizeEndpoint(endpoint string) (string, error) {
@@ -70,6 +78,12 @@ func normalizeEndpoint(endpoint string) (string, error) {
 func outputJSON(chain *tlsquery.ChainInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
+	return encoder.Encode(chain)
+}
+
+func outputYAML(chain *tlsquery.ChainInfo) error {
+	encoder := yaml.NewEncoder(os.Stdout)
+	encoder.SetIndent(2)
 	return encoder.Encode(chain)
 }
 

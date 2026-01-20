@@ -4,11 +4,11 @@ import "testing"
 
 func TestNormalizeEndpoint(t *testing.T) {
 	tests := []struct {
-		name       string
-		endpoint   string
-		want       string
-		wantError  bool
-		errorMsg   string
+		name      string
+		endpoint  string
+		want      string
+		wantError bool
+		errorMsg  string
 	}{
 		{
 			name:     "valid endpoint with port",

@@ -39,17 +39,7 @@ func runClient(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	switch outputFormat {
-	case "json":
-		return outputJSON(certInfo)
-	case "yaml":
-		return outputYAML(certInfo)
-	case "text":
-		outputText(certInfo)
-		return nil
-	default:
-		return fmt.Errorf("invalid output format: %q (valid: text, json, yaml)", outputFormat)
-	}
+	return outputChain(certInfo, outputFormat)
 }
 
 func normalizeEndpoint(endpoint string) (string, error) {
@@ -75,30 +65,32 @@ func normalizeEndpoint(endpoint string) (string, error) {
 	return host + ":" + port, nil
 }
 
-func outputJSON(chain *tlsquery.ChainInfo) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(chain)
-}
-
-func outputYAML(chain *tlsquery.ChainInfo) error {
-	encoder := yaml.NewEncoder(os.Stdout)
-	encoder.SetIndent(2)
-	return encoder.Encode(chain)
-}
-
-func outputText(chain *tlsquery.ChainInfo) {
-	for i, cert := range chain.Certificates {
-		if i > 0 {
-			fmt.Println()
+func outputChain(chain *tlsquery.ChainInfo, format string) error {
+	switch format {
+	case "json":
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(chain)
+	case "yaml":
+		encoder := yaml.NewEncoder(os.Stdout)
+		encoder.SetIndent(2)
+		return encoder.Encode(chain)
+	case "text":
+		for i, cert := range chain.Certificates {
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Printf("[%s]\n", strings.ToUpper(cert.Type))
+			fmt.Printf("Common Name:           %s\n", cert.CommonName)
+			fmt.Printf("Issuer:                %s\n", cert.Issuer)
+			fmt.Printf("Valid From:            %s\n", cert.NotBefore)
+			fmt.Printf("Valid Until:           %s\n", cert.NotAfter)
+			if len(cert.SubjectAltNames) > 0 {
+				fmt.Printf("Subject Alt Names:     %s\n", strings.Join(cert.SubjectAltNames, ", "))
+			}
 		}
-		fmt.Printf("[%s]\n", strings.ToUpper(cert.Type))
-		fmt.Printf("Common Name:           %s\n", cert.CommonName)
-		fmt.Printf("Issuer:                %s\n", cert.Issuer)
-		fmt.Printf("Valid From:            %s\n", cert.NotBefore)
-		fmt.Printf("Valid Until:           %s\n", cert.NotAfter)
-		if len(cert.SubjectAltNames) > 0 {
-			fmt.Printf("Subject Alt Names:     %s\n", strings.Join(cert.SubjectAltNames, ", "))
-		}
+		return nil
+	default:
+		return fmt.Errorf("invalid output format: %q (valid: text, json, yaml)", format)
 	}
 }

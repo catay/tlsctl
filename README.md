@@ -10,6 +10,8 @@ go build -o tlsctl .
 
 ## Usage
 
+### Query remote TLS endpoints
+
 ```bash
 # Human-readable output (port defaults to 443)
 tlsctl client google.com
@@ -22,6 +24,22 @@ tlsctl client -o json example.com
 
 # YAML output
 tlsctl client --output yaml example.com
+```
+
+### Parse PEM files
+
+```bash
+# Parse a single certificate
+tlsctl pem cert.pem
+
+# Parse a certificate chain (multiple certs in one file)
+tlsctl pem chain.pem
+
+# JSON output
+tlsctl pem -o json cert.pem
+
+# YAML output
+tlsctl pem --output yaml cert.pem
 ```
 
 ## Output Formats

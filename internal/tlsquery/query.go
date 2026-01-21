@@ -72,3 +72,26 @@ func certType(index int, cert *x509.Certificate) string {
 	}
 	return "intermediate"
 }
+
+// CertTypeFromCert determines the certificate type based on its properties.
+func CertTypeFromCert(cert *x509.Certificate) string {
+	if cert.IsCA {
+		if cert.Subject.String() == cert.Issuer.String() {
+			return "root"
+		}
+		return "intermediate"
+	}
+	return "leaf"
+}
+
+// CertInfoFromCert creates a CertInfo from an x509.Certificate.
+func CertInfoFromCert(cert *x509.Certificate) CertInfo {
+	return CertInfo{
+		CommonName:      cert.Subject.CommonName,
+		Issuer:          cert.Issuer.CommonName,
+		NotBefore:       cert.NotBefore.UTC().Format(time.RFC3339),
+		NotAfter:        cert.NotAfter.UTC().Format(time.RFC3339),
+		SubjectAltNames: cert.DNSNames,
+		Type:            CertTypeFromCert(cert),
+	}
+}

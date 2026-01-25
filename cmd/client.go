@@ -81,13 +81,52 @@ func outputChain(chain *tlsquery.ChainInfo, format string) error {
 				fmt.Println()
 			}
 			fmt.Printf("[%s]\n", strings.ToUpper(cert.Type))
-			fmt.Printf("Common Name:           %s\n", cert.CommonName)
+			fmt.Printf("Version:               %d\n", cert.Version)
+			fmt.Printf("Serial Number:         %s\n", cert.SerialNumber)
+			fmt.Printf("Signature Algorithm:   %s\n", cert.SignatureAlgorithm)
 			fmt.Printf("Issuer:                %s\n", cert.Issuer)
-			fmt.Printf("Valid From:            %s\n", cert.NotBefore)
-			fmt.Printf("Valid Until:           %s\n", cert.NotAfter)
+			fmt.Printf("Subject:               %s\n", cert.Subject)
+			fmt.Printf("Not Before:            %s\n", cert.NotBefore)
+			fmt.Printf("Not After:             %s\n", cert.NotAfter)
+			fmt.Printf("Public Key Algorithm:  %s\n", cert.PublicKeyAlgorithm)
+			if len(cert.KeyUsage) > 0 {
+				fmt.Printf("Key Usage:             %s\n", strings.Join(cert.KeyUsage, ", "))
+			}
+			if len(cert.ExtKeyUsage) > 0 {
+				fmt.Printf("Extended Key Usage:    %s\n", strings.Join(cert.ExtKeyUsage, ", "))
+			}
+			if cert.BasicConstraints != nil {
+				if cert.BasicConstraints.IsCA {
+					fmt.Printf("Basic Constraints:     CA:TRUE, pathlen:%d\n", cert.BasicConstraints.MaxPathLen)
+				} else {
+					fmt.Printf("Basic Constraints:     CA:FALSE\n")
+				}
+			}
+			if cert.SubjectKeyID != "" {
+				fmt.Printf("Subject Key ID:        %s\n", cert.SubjectKeyID)
+			}
+			if cert.AuthorityKeyID != "" {
+				fmt.Printf("Authority Key ID:      %s\n", cert.AuthorityKeyID)
+			}
 			if len(cert.SubjectAltNames) > 0 {
 				fmt.Printf("Subject Alt Names:     %s\n", strings.Join(cert.SubjectAltNames, ", "))
 			}
+			if len(cert.EmailAddresses) > 0 {
+				fmt.Printf("Email Addresses:       %s\n", strings.Join(cert.EmailAddresses, ", "))
+			}
+			if len(cert.IPAddresses) > 0 {
+				fmt.Printf("IP Addresses:          %s\n", strings.Join(cert.IPAddresses, ", "))
+			}
+			if len(cert.OCSPServers) > 0 {
+				fmt.Printf("OCSP Servers:          %s\n", strings.Join(cert.OCSPServers, ", "))
+			}
+			if len(cert.IssuingCertURL) > 0 {
+				fmt.Printf("CA Issuers:            %s\n", strings.Join(cert.IssuingCertURL, ", "))
+			}
+			if len(cert.CRLDistPoints) > 0 {
+				fmt.Printf("CRL Distribution:      %s\n", strings.Join(cert.CRLDistPoints, ", "))
+			}
+			fmt.Printf("PEM:\n%s", cert.PEM)
 		}
 		return nil
 	default:

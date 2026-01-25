@@ -1,6 +1,8 @@
 package tlsquery
 
 import (
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -33,7 +35,14 @@ type CertInfo struct {
 	OCSPServers        []string          `json:"ocsp_servers,omitempty"`
 	IssuingCertURL     []string          `json:"issuing_cert_url,omitempty"`
 	CRLDistPoints      []string          `json:"crl_distribution_points,omitempty"`
+	Fingerprint        Fingerprint       `json:"fingerprint"`
 	PEM                string            `json:"pem"`
+}
+
+// Fingerprint holds SHA1 and SHA256 fingerprints of a certificate.
+type Fingerprint struct {
+	SHA1   string `json:"sha1"`
+	SHA256 string `json:"sha256"`
 }
 
 // BasicConstraints holds CA constraint information.
@@ -125,6 +134,7 @@ func CertInfoFromCert(cert *x509.Certificate) CertInfo {
 		OCSPServers:        cert.OCSPServer,
 		IssuingCertURL:     cert.IssuingCertificateURL,
 		CRLDistPoints:      cert.CRLDistributionPoints,
+		Fingerprint:        computeFingerprint(cert.Raw),
 		PEM:                encodePEM(cert.Raw),
 	}
 
@@ -220,5 +230,22 @@ func encodePEM(raw []byte) string {
 		Bytes: raw,
 	}
 	return string(pem.EncodeToMemory(block))
+}
+
+func computeFingerprint(der []byte) Fingerprint {
+	sha1Sum := sha1.Sum(der)
+	sha256Sum := sha256.Sum256(der)
+	return Fingerprint{
+		SHA1:   formatFingerprint(sha1Sum[:]),
+		SHA256: formatFingerprint(sha256Sum[:]),
+	}
+}
+
+func formatFingerprint(sum []byte) string {
+	parts := make([]string, len(sum))
+	for i, b := range sum {
+		parts[i] = fmt.Sprintf("%02x", b)
+	}
+	return strings.Join(parts, ":")
 }
 

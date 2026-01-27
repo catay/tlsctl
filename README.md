@@ -8,6 +8,24 @@ A command-line tool to query and inspect TLS certificates from remote endpoints 
 go build -o tlsctl .
 ```
 
+## Docker
+
+### Build
+
+```bash
+docker build -t tlsctl .
+```
+
+### Run
+
+```bash
+# Query a remote TLS endpoint
+docker run --rm tlsctl client google.com
+
+# Parse a local PEM file (mount the file into the container)
+docker run --rm -v /path/to/cert.pem:/cert.pem:ro tlsctl pem /cert.pem
+```
+
 ## Usage
 
 ### Query remote TLS endpoints

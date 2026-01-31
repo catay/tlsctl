@@ -14,6 +14,7 @@ import (
 )
 
 var outputFormat string
+var showPEM bool
 
 var clientCmd = &cobra.Command{
 	Use:   "client FQDN[:PORT]",
@@ -26,6 +27,7 @@ var clientCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(clientCmd)
 	clientCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "Output format (text, json, yaml)")
+	clientCmd.Flags().BoolVar(&showPEM, "show-pem", false, "Include PEM-encoded certificate in output")
 }
 
 func runClient(cmd *cobra.Command, args []string) error {
@@ -39,7 +41,7 @@ func runClient(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return outputChain(certInfo, outputFormat)
+	return outputChain(certInfo, outputFormat, showPEM)
 }
 
 func normalizeEndpoint(endpoint string) (string, error) {
@@ -65,18 +67,29 @@ func normalizeEndpoint(endpoint string) (string, error) {
 	return host + ":" + port, nil
 }
 
-func outputChain(chain *tlsquery.ChainInfo, format string) error {
+func outputChain(chain *tlsquery.ChainInfo, format string, showPEM bool) error {
+	outputChain := chain
+	if !showPEM {
+		outputChain = &tlsquery.ChainInfo{
+			Certificates: make([]tlsquery.CertInfo, len(chain.Certificates)),
+		}
+		for i, cert := range chain.Certificates {
+			outputChain.Certificates[i] = cert
+			outputChain.Certificates[i].PEM = ""
+		}
+	}
+
 	switch format {
 	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(chain)
+		return encoder.Encode(outputChain)
 	case "yaml":
 		encoder := yaml.NewEncoder(os.Stdout)
 		encoder.SetIndent(2)
-		return encoder.Encode(chain)
+		return encoder.Encode(outputChain)
 	case "text":
-		for i, cert := range chain.Certificates {
+		for i, cert := range outputChain.Certificates {
 			if i > 0 {
 				fmt.Println()
 			}
@@ -126,7 +139,9 @@ func outputChain(chain *tlsquery.ChainInfo, format string) error {
 			if len(cert.CRLDistPoints) > 0 {
 				fmt.Printf("CRL Distribution:      %s\n", strings.Join(cert.CRLDistPoints, ", "))
 			}
-			fmt.Printf("PEM:\n%s", cert.PEM)
+			if cert.PEM != "" {
+				fmt.Printf("PEM:\n%s", cert.PEM)
+			}
 		}
 		return nil
 	default:

@@ -36,7 +36,7 @@ type CertInfo struct {
 	IssuingCertURL     []string          `json:"issuing_cert_url,omitempty"`
 	CRLDistPoints      []string          `json:"crl_distribution_points,omitempty"`
 	Fingerprint        Fingerprint       `json:"fingerprint"`
-	PEM                string            `json:"pem"`
+	PEM                string            `json:"pem,omitempty"`
 }
 
 // Fingerprint holds SHA1 and SHA256 fingerprints of a certificate.

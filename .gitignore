@@ -28,3 +28,6 @@ vendor/
 *.swp
 *.swo
 *~
+
+# goreleaser
+dist/

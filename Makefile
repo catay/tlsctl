@@ -1,4 +1,4 @@
-.PHONY: build test clean
+.PHONY: build test clean release-local
 
 BINARY := tlsctl
 
@@ -11,3 +11,6 @@ test:
 clean:
 	rm -f $(BINARY)
 	go clean
+
+release-local:
+	goreleaser release --snapshot --clean

@@ -6,6 +6,7 @@ import (
 )
 
 var pemOutputFormat string
+var pemShowPEM bool
 
 var pemCmd = &cobra.Command{
 	Use:   "pem FILE",
@@ -18,6 +19,7 @@ var pemCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(pemCmd)
 	pemCmd.Flags().StringVarP(&pemOutputFormat, "output", "o", "text", "Output format (text, json, yaml)")
+	pemCmd.Flags().BoolVar(&pemShowPEM, "show-pem", false, "Include PEM-encoded certificate in output")
 }
 
 func runPem(cmd *cobra.Command, args []string) error {
@@ -26,5 +28,5 @@ func runPem(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return outputChain(chainInfo, pemOutputFormat)
+	return outputChain(chainInfo, pemOutputFormat, pemShowPEM)
 }

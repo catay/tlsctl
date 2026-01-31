@@ -42,6 +42,9 @@ tlsctl client -o json example.com
 
 # YAML output
 tlsctl client --output yaml example.com
+
+# Include PEM-encoded certificate in output
+tlsctl client --show-pem example.com
 ```
 
 ### Parse PEM files
@@ -58,6 +61,9 @@ tlsctl pem -o json cert.pem
 
 # YAML output
 tlsctl pem --output yaml cert.pem
+
+# Include PEM-encoded certificate in output
+tlsctl pem --show-pem cert.pem
 ```
 
 ## Output Formats
@@ -85,7 +91,7 @@ The tool extracts and displays:
 - **Email Addresses / IP Addresses**: Additional identifiers
 - **OCSP Servers / CA Issuers / CRL Distribution Points**: Revocation info
 - **Fingerprint**: SHA1 and SHA256 fingerprints
-- **PEM**: The certificate in PEM format
+- **PEM**: The certificate in PEM format (hidden by default, use `--show-pem` to display)
 
 ## Example Output
 
@@ -108,10 +114,6 @@ Authority Key ID:      12:34:56:...
 Subject Alt Names:     *.google.com, *.appengine.google.com, ...
 OCSP Servers:          http://ocsp.pki.goog/wr2
 CA Issuers:            http://pki.goog/repo/certs/wr2.der
-PEM:
------BEGIN CERTIFICATE-----
-...
------END CERTIFICATE-----
 
 [INTERMEDIATE]
 Version:               3
@@ -144,8 +146,7 @@ Version:               3
       "fingerprint": {
         "sha1": "ab:cd:ef:...",
         "sha256": "12:34:56:..."
-      },
-      "pem": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+      }
     }
   ]
 }
@@ -174,8 +175,4 @@ certificates:
     fingerprint:
       sha1: "ab:cd:ef:..."
       sha256: "12:34:56:..."
-    pem: |
-      -----BEGIN CERTIFICATE-----
-      ...
-      -----END CERTIFICATE-----
 ```

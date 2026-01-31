@@ -3,13 +3,13 @@
 BINARY := tlsctl
 
 build:
-	go build -o $(BINARY) .
+	goreleaser build --single-target --snapshot --clean -o $(BINARY)
 
 test:
 	go test ./...
 
 clean:
-	rm -f $(BINARY)
+	rm -rf $(BINARY) dist
 	go clean
 
 release-local:

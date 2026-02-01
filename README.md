@@ -31,20 +31,23 @@ docker run --rm -v /path/to/cert.pem:/cert.pem:ro tlsctl pem /cert.pem
 ### Query remote TLS endpoints
 
 ```bash
-# Human-readable output (port defaults to 443)
+# Brief human-readable output (default, port defaults to 443)
 tlsctl client google.com
 
 # With explicit port
 tlsctl client google.com:8443
 
+# Verbose text output (all certificate fields)
+tlsctl client -o text example.com
+
 # JSON output
 tlsctl client -o json example.com
 
 # YAML output
-tlsctl client --output yaml example.com
+tlsctl client -o yaml example.com
 
-# Include PEM-encoded certificate in output
-tlsctl client --show-pem example.com
+# Raw PEM-encoded certificates
+tlsctl client -o raw example.com
 ```
 
 ### Parse PEM files
@@ -56,21 +59,26 @@ tlsctl pem cert.pem
 # Parse a certificate chain (multiple certs in one file)
 tlsctl pem chain.pem
 
+# Verbose text output
+tlsctl pem -o text cert.pem
+
 # JSON output
 tlsctl pem -o json cert.pem
 
 # YAML output
-tlsctl pem --output yaml cert.pem
+tlsctl pem -o yaml cert.pem
 
-# Include PEM-encoded certificate in output
-tlsctl pem --show-pem cert.pem
+# Raw PEM output
+tlsctl pem -o raw cert.pem
 ```
 
 ## Output Formats
 
-- `text` (default) - Human-readable output
-- `json` - JSON format
-- `yaml` - YAML format
+- (default) - Brief human-readable summary with expiry status
+- `text` - Verbose output with all certificate fields
+- `json` - Full structured JSON format
+- `yaml` - Full structured YAML format
+- `raw` - PEM-encoded certificates
 
 ## Certificate Fields
 
@@ -91,11 +99,28 @@ The tool extracts and displays:
 - **Email Addresses / IP Addresses**: Additional identifiers
 - **OCSP Servers / CA Issuers / CRL Distribution Points**: Revocation info
 - **Fingerprint**: SHA1 and SHA256 fingerprints
-- **PEM**: The certificate in PEM format (hidden by default, use `--show-pem` to display)
+- **PEM**: The certificate in PEM format (use `-o raw` to output)
 
 ## Example Output
 
-### Text (default)
+### Default (brief human-readable)
+
+```
+✓ *.google.com (expires in 89 days)
+  Subject:  CN=*.google.com
+  Issuer:   CN=WR2,O=Google Trust Services,C=US
+  Validity: 2025-12-09 → 2026-03-03
+  SANs:     *.google.com, *.appengine.google.com, *.cloud.google.com (+135 more)
+
+  Chain: *.google.com → WR2 → GTS Root R1 (3 certificates)
+```
+
+Status indicators:
+- `✓` - Certificate is valid
+- `⚠` - Certificate expires within 30 days
+- `✗` - Certificate has expired
+
+### Text (verbose)
 
 ```
 [LEAF]

@@ -26,5 +26,5 @@ func runPem(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return outputChain(chainInfo, pemOutputFormat)
+	return outputChain(chainInfo, pemOutputFormat, false)
 }

@@ -48,6 +48,10 @@ tlsctl client -o yaml example.com
 
 # Raw PEM-encoded certificates
 tlsctl client -o raw example.com
+
+# Skip certificate verification (for self-signed or untrusted certs)
+tlsctl client --insecure example.com
+tlsctl client -k example.com
 ```
 
 ### Parse PEM files
@@ -117,7 +121,7 @@ The tool extracts and displays:
 
 Status indicators:
 - `✓` - Certificate is valid
-- `⚠` - Certificate expires within 30 days
+- `⚠` - Certificate expires within 30 days, or queried with `--insecure`
 - `✗` - Certificate has expired
 
 ### Text (verbose)

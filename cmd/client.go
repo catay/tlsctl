@@ -15,6 +15,7 @@ import (
 )
 
 var outputFormat string
+var insecureMode bool
 
 var clientCmd = &cobra.Command{
 	Use:   "client FQDN[:PORT]",
@@ -27,6 +28,7 @@ var clientCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(clientCmd)
 	clientCmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
+	clientCmd.Flags().BoolVarP(&insecureMode, "insecure", "k", false, "Skip certificate verification (insecure)")
 }
 
 func runClient(cmd *cobra.Command, args []string) error {
@@ -35,12 +37,13 @@ func runClient(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	certInfo, err := tlsquery.Query(endpoint)
+	opts := tlsquery.QueryOptions{Insecure: insecureMode}
+	certInfo, err := tlsquery.Query(endpoint, opts)
 	if err != nil {
 		return err
 	}
 
-	return outputChain(certInfo, outputFormat)
+	return outputChain(certInfo, outputFormat, insecureMode)
 }
 
 func normalizeEndpoint(endpoint string) (string, error) {
@@ -66,7 +69,7 @@ func normalizeEndpoint(endpoint string) (string, error) {
 	return host + ":" + port, nil
 }
 
-func outputChain(chain *tlsquery.ChainInfo, format string) error {
+func outputChain(chain *tlsquery.ChainInfo, format string, insecure bool) error {
 	// Strip PEM from output unless raw format
 	outputData := chain
 	if format != "raw" {
@@ -94,15 +97,15 @@ func outputChain(chain *tlsquery.ChainInfo, format string) error {
 		}
 		return nil
 	case "text":
-		return outputVerboseText(outputData)
+		return outputVerboseText(outputData, insecure)
 	case "":
-		return outputHumanReadable(chain)
+		return outputHumanReadable(chain, insecure)
 	default:
 		return fmt.Errorf("invalid output format: %q (valid: json, yaml, text, raw)", format)
 	}
 }
 
-func outputHumanReadable(chain *tlsquery.ChainInfo) error {
+func outputHumanReadable(chain *tlsquery.ChainInfo, insecure bool) error {
 	if len(chain.Certificates) == 0 {
 		return fmt.Errorf("no certificates in chain")
 	}
@@ -128,6 +131,9 @@ func outputHumanReadable(chain *tlsquery.ChainInfo) error {
 	case now.After(notAfter):
 		status = color.RedString("✗")
 		statusMsg = "expired"
+	case insecure:
+		status = color.YellowString("⚠")
+		statusMsg = fmt.Sprintf("insecure, expires in %d days", daysUntilExpiry)
 	case daysUntilExpiry <= 30:
 		status = color.YellowString("⚠")
 		statusMsg = fmt.Sprintf("expires in %d days", daysUntilExpiry)
@@ -186,7 +192,10 @@ func outputHumanReadable(chain *tlsquery.ChainInfo) error {
 	return nil
 }
 
-func outputVerboseText(chain *tlsquery.ChainInfo) error {
+func outputVerboseText(chain *tlsquery.ChainInfo, insecure bool) error {
+	if insecure {
+		fmt.Printf("%s Certificate verification was skipped (insecure mode)\n\n", color.YellowString("⚠"))
+	}
 	for i, cert := range chain.Certificates {
 		if i > 0 {
 			fmt.Println()

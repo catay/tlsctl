@@ -59,12 +59,24 @@ type ChainInfo struct {
 // TLSConfig allows customizing the TLS configuration for testing.
 var TLSConfig *tls.Config
 
+// QueryOptions configures the TLS query behavior.
+type QueryOptions struct {
+	Insecure bool // Skip certificate verification
+}
+
 // Query connects to the given endpoint and retrieves certificate chain information.
-func Query(endpoint string) (*ChainInfo, error) {
+func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 	config := TLSConfig
 	if config == nil {
 		config = &tls.Config{}
+	} else {
+		config = config.Clone()
 	}
+
+	if len(opts) > 0 && opts[0].Insecure {
+		config.InsecureSkipVerify = true
+	}
+
 	conn, err := tls.Dial("tcp", endpoint, config)
 	if err != nil {
 		return nil, fmt.Errorf("TLS handshake failed: %w", err)

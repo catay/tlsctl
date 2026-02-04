@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -61,7 +62,8 @@ var TLSConfig *tls.Config
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	Insecure bool // Skip certificate verification
+	Insecure   bool   // Skip certificate verification
+	CACertFile string // Path to custom CA certificate file (PEM format)
 }
 
 // Query connects to the given endpoint and retrieves certificate chain information.
@@ -73,8 +75,21 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		config = config.Clone()
 	}
 
-	if len(opts) > 0 && opts[0].Insecure {
-		config.InsecureSkipVerify = true
+	if len(opts) > 0 {
+		if opts[0].Insecure {
+			config.InsecureSkipVerify = true
+		}
+		if opts[0].CACertFile != "" {
+			caCert, err := os.ReadFile(opts[0].CACertFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+			}
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM(caCert) {
+				return nil, fmt.Errorf("failed to parse CA certificate")
+			}
+			config.RootCAs = caCertPool
+		}
 	}
 
 	conn, err := tls.Dial("tcp", endpoint, config)

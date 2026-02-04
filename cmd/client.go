@@ -16,6 +16,7 @@ import (
 
 var outputFormat string
 var insecureMode bool
+var caCertFile string
 
 var clientCmd = &cobra.Command{
 	Use:   "client FQDN[:PORT]",
@@ -29,6 +30,7 @@ func init() {
 	rootCmd.AddCommand(clientCmd)
 	clientCmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
 	clientCmd.Flags().BoolVarP(&insecureMode, "insecure", "k", false, "Skip certificate verification (insecure)")
+	clientCmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 }
 
 func runClient(cmd *cobra.Command, args []string) error {
@@ -37,7 +39,7 @@ func runClient(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	opts := tlsquery.QueryOptions{Insecure: insecureMode}
+	opts := tlsquery.QueryOptions{Insecure: insecureMode, CACertFile: caCertFile}
 	certInfo, err := tlsquery.Query(endpoint, opts)
 	if err != nil {
 		return err

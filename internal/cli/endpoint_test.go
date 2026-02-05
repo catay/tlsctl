@@ -1,10 +1,8 @@
-package cmd
+package cli
 
 import (
-	"bytes"
+	"strings"
 	"testing"
-
-	"github.com/tlsctl/internal/cli"
 )
 
 func TestNormalizeEndpoint(t *testing.T) {
@@ -69,17 +67,32 @@ func TestNormalizeEndpoint(t *testing.T) {
 			wantError: true,
 			errorMsg:  "port must be a number in the range 0-65535",
 		},
+		{
+			name:     "IPv6 address with port",
+			endpoint: "[::1]:443",
+			want:     "[::1]:443",
+		},
+		{
+			name:     "IPv6 address without port",
+			endpoint: "::1",
+			want:     "[::1]:443",
+		},
+		{
+			name:     "full IPv6 address with port",
+			endpoint: "[2001:db8::1]:8443",
+			want:     "[2001:db8::1]:8443",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := cli.NormalizeEndpoint(tt.endpoint)
+			got, err := NormalizeEndpoint(tt.endpoint)
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("NormalizeEndpoint(%q) expected error, got nil", tt.endpoint)
 					return
 				}
-				if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+				if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("NormalizeEndpoint(%q) error = %q, want to contain %q", tt.endpoint, err.Error(), tt.errorMsg)
 				}
 			} else {
@@ -92,8 +105,4 @@ func TestNormalizeEndpoint(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return bytes.Contains([]byte(s), []byte(substr))
 }

@@ -275,4 +275,3 @@ func formatFingerprint(sum []byte) string {
 	}
 	return strings.Join(parts, ":")
 }
-

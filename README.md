@@ -1,5 +1,7 @@
 # tlsctl
 
+[![CI](https://github.com/catay/tlsctl/actions/workflows/pr.yaml/badge.svg)](https://github.com/catay/tlsctl/actions/workflows/pr.yaml)
+
 A command-line tool to query and inspect TLS certificates from remote endpoints or local PEM files.
 
 ## Installation

@@ -1,13 +1,17 @@
 package tlsquery
 
 import (
+	"bufio"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -64,6 +68,7 @@ var TLSConfig *tls.Config
 type QueryOptions struct {
 	Insecure   bool   // Skip certificate verification
 	CACertFile string // Path to custom CA certificate file (PEM format)
+	Proxy      string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
 }
 
 // Query connects to the given endpoint and retrieves certificate chain information.
@@ -92,8 +97,29 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		}
 	}
 
-	conn, err := tls.Dial("tcp", endpoint, config)
+	host, _, _ := net.SplitHostPort(endpoint)
+	if config.ServerName == "" && host != "" && net.ParseIP(host) == nil {
+		config.ServerName = host
+	}
+
+	proxyURL, err := resolveProxy(endpoint, opts)
 	if err != nil {
+		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
+	}
+
+	var rawConn net.Conn
+	if proxyURL != nil {
+		rawConn, err = dialViaProxy(endpoint, proxyURL, 10*time.Second)
+	} else {
+		rawConn, err = (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", endpoint)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("connection failed: %w", err)
+	}
+
+	conn := tls.Client(rawConn, config)
+	if err := conn.Handshake(); err != nil {
+		rawConn.Close()
 		return nil, fmt.Errorf("TLS handshake failed: %w", err)
 	}
 	defer conn.Close()
@@ -274,4 +300,91 @@ func formatFingerprint(sum []byte) string {
 		parts[i] = fmt.Sprintf("%02x", b)
 	}
 	return strings.Join(parts, ":")
+}
+
+func resolveProxy(endpoint string, opts []QueryOptions) (*url.URL, error) {
+	var proxyStr string
+	if len(opts) > 0 {
+		proxyStr = opts[0].Proxy
+	}
+
+	if proxyStr != "" {
+		if !strings.Contains(proxyStr, "://") {
+			proxyStr = "http://" + proxyStr
+		}
+		return url.Parse(proxyStr)
+	}
+
+	req := &http.Request{URL: &url.URL{Scheme: "https", Host: endpoint}}
+	return http.ProxyFromEnvironment(req)
+}
+
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (b *bufferedConn) Read(p []byte) (int, error) {
+	return b.r.Read(p)
+}
+
+func dialViaProxy(endpoint string, proxyURL *url.URL, timeout time.Duration) (net.Conn, error) {
+	proxyAddr := proxyURL.Host
+	if _, _, err := net.SplitHostPort(proxyAddr); err != nil {
+		port := "8080"
+		if proxyURL.Scheme == "https" {
+			port = "443"
+		}
+		proxyAddr = net.JoinHostPort(proxyAddr, port)
+	}
+
+	dialer := &net.Dialer{Timeout: timeout}
+	conn, err := dialer.Dial("tcp", proxyAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to proxy %s: %w", proxyAddr, err)
+	}
+
+	if proxyURL.Scheme == "https" {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: proxyURL.Hostname()})
+		if err := tlsConn.Handshake(); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("TLS handshake with proxy failed: %w", err)
+		}
+		conn = tlsConn
+	}
+
+	br := bufio.NewReader(conn)
+
+	req := &http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{Opaque: endpoint},
+		Host:   endpoint,
+		Header: make(http.Header),
+	}
+
+	if proxyURL.User != nil {
+		user := proxyURL.User.Username()
+		pass, _ := proxyURL.User.Password()
+		cred := base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
+		req.Header.Set("Proxy-Authorization", "Basic "+cred)
+	}
+
+	if err := req.Write(conn); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to send CONNECT request: %w", err)
+	}
+
+	resp, err := http.ReadResponse(br, req)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to read proxy response: %w", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		conn.Close()
+		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+	}
+
+	return &bufferedConn{Conn: conn, r: br}, nil
 }

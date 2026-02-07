@@ -253,7 +253,7 @@ func handleProxyConnection(conn net.Conn, targetAddr string, requireAuth bool) {
 			ProtoMajor: 1,
 			ProtoMinor: 1,
 		}
-		resp.Write(conn)
+		resp.Write(conn) //nolint:errcheck
 		return
 	}
 
@@ -265,7 +265,7 @@ func handleProxyConnection(conn net.Conn, targetAddr string, requireAuth bool) {
 				ProtoMajor: 1,
 				ProtoMinor: 1,
 			}
-			resp.Write(conn)
+			resp.Write(conn) //nolint:errcheck
 			return
 		}
 		expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:pass"))
@@ -275,7 +275,7 @@ func handleProxyConnection(conn net.Conn, targetAddr string, requireAuth bool) {
 				ProtoMajor: 1,
 				ProtoMinor: 1,
 			}
-			resp.Write(conn)
+			resp.Write(conn) //nolint:errcheck
 			return
 		}
 	}
@@ -287,15 +287,15 @@ func handleProxyConnection(conn net.Conn, targetAddr string, requireAuth bool) {
 			ProtoMajor: 1,
 			ProtoMinor: 1,
 		}
-		resp.Write(conn)
+		resp.Write(conn) //nolint:errcheck
 		return
 	}
 	defer target.Close()
 
 	fmt.Fprint(conn, "HTTP/1.1 200 Connection established\r\n\r\n")
 
-	go io.Copy(target, br)
-	io.Copy(conn, target)
+	go io.Copy(target, br) //nolint:errcheck
+	io.Copy(conn, target) //nolint:errcheck
 }
 
 func TestQuery_ViaProxy(t *testing.T) {
@@ -385,7 +385,7 @@ func TestDialViaProxy_ProxyRejectsConnect(t *testing.T) {
 		}
 		defer conn.Close()
 		br := bufio.NewReader(conn)
-		http.ReadRequest(br)
+		http.ReadRequest(br) //nolint:errcheck
 		fmt.Fprint(conn, "HTTP/1.1 403 Forbidden\r\n\r\n")
 	}()
 

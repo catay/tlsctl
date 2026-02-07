@@ -1,4 +1,4 @@
-.PHONY: build test clean release-local
+.PHONY: build test lint clean release-local
 
 BINARY := tlsctl
 
@@ -7,6 +7,9 @@ build:
 
 test:
 	go test ./...
+
+lint:
+	golangci-lint run ./...
 
 clean:
 	rm -rf $(BINARY) dist

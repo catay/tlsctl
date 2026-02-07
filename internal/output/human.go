@@ -29,25 +29,26 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	now := opts.NowFunc()
 	daysUntilExpiry := int(notAfter.Sub(now).Hours() / 24)
 
+	bold := color.New(color.Bold)
 	var status, statusMsg string
 	switch {
 	case now.After(notAfter):
-		status = color.RedString("✗")
+		status = bold.Add(color.FgRed).Sprint("✗")
 		statusMsg = "expired"
 	case opts.Insecure:
-		status = color.YellowString("⚠")
+		status = bold.Add(color.FgYellow).Sprint("⚠")
 		statusMsg = fmt.Sprintf("insecure, expires in %d days", daysUntilExpiry)
 	case daysUntilExpiry <= 30:
-		status = color.YellowString("⚠")
+		status = bold.Add(color.FgYellow).Sprint("⚠")
 		statusMsg = fmt.Sprintf("expires in %d days", daysUntilExpiry)
 	default:
-		status = color.GreenString("✓")
+		status = bold.Add(color.FgGreen).Sprint("✓")
 		statusMsg = fmt.Sprintf("expires in %d days", daysUntilExpiry)
 	}
 
 	displayName := leaf.DisplayName()
 
-	fmt.Fprintf(w, "%s %s (%s)\n", status, displayName, statusMsg)
+	fmt.Fprintf(w, "%s (%s) %s\n", displayName, statusMsg, status)
 	fmt.Fprintf(w, "  Subject:  %s\n", leaf.Subject)
 	fmt.Fprintf(w, "  Issuer:   %s\n", leaf.Issuer)
 	fmt.Fprintf(w, "  Validity: %s → %s\n",

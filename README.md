@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/catay/tlsctl/actions/workflows/ci.yaml/badge.svg)](https://github.com/catay/tlsctl/actions/workflows/ci.yaml)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/catay/tlsctl/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/catay/tlsctl)](https://github.com/catay/tlsctl/releases/latest)
 
 A command-line tool to query and inspect TLS certificates from remote endpoints or local PEM files.
 

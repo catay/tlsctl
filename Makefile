@@ -1,6 +1,8 @@
-.PHONY: build test lint clean release-local
+.PHONY: all build test lint fmt clean release-local
 
 BINARY := tlsctl
+
+all: clean lint fmt test build
 
 build:
 	goreleaser build --single-target --snapshot --clean -o $(BINARY)

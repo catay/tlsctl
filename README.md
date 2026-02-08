@@ -1,6 +1,8 @@
 # tlsctl
 
 [![CI](https://github.com/catay/tlsctl/actions/workflows/ci.yaml/badge.svg)](https://github.com/catay/tlsctl/actions/workflows/ci.yaml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/catay/tlsctl)](https://github.com/catay/tlsctl/blob/main/go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/catay/tlsctl)](https://goreportcard.com/report/github.com/catay/tlsctl)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/catay/tlsctl/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/catay/tlsctl)](https://github.com/catay/tlsctl/releases/latest)
 

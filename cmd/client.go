@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tlsctl/internal/cli"
-	"github.com/tlsctl/internal/output"
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/cli"
+	"github.com/catay/tlsctl/internal/output"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 func newClientCmd() *cobra.Command {

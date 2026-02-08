@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/tlsctl/internal/cli"
+	"github.com/catay/tlsctl/internal/cli"
 )
 
 func TestNormalizeEndpoint(t *testing.T) {

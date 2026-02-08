@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tlsctl/internal/output"
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/output"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 func newPemCmd() *cobra.Command {

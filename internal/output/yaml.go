@@ -3,7 +3,7 @@ package output
 import (
 	"io"
 
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/tlsquery"
 	"gopkg.in/yaml.v3"
 )
 

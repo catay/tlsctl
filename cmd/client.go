@@ -12,7 +12,6 @@ import (
 
 func newClientCmd() *cobra.Command {
 	var outputFormat string
-	var insecureMode bool
 	var caCertFile string
 	var proxyURL string
 
@@ -27,7 +26,7 @@ func newClientCmd() *cobra.Command {
 				return err
 			}
 
-			opts := tlsquery.QueryOptions{Insecure: insecureMode, CACertFile: caCertFile, Proxy: proxyURL}
+			opts := tlsquery.QueryOptions{CACertFile: caCertFile, Proxy: proxyURL}
 			certInfo, err := tlsquery.Query(endpoint, opts)
 			if err != nil {
 				return err
@@ -39,15 +38,13 @@ func newClientCmd() *cobra.Command {
 			}
 
 			renderOpts := output.Options{
-				Insecure: insecureMode,
-				Now:      time.Now,
+				Now: time.Now,
 			}
 			return renderer.Render(os.Stdout, certInfo, renderOpts)
 		},
 	}
 
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
-	cmd.Flags().BoolVarP(&insecureMode, "insecure", "k", false, "Skip certificate verification (insecure)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 

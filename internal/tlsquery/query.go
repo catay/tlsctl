@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -58,7 +59,9 @@ type BasicConstraints struct {
 
 // ChainInfo holds the full certificate chain.
 type ChainInfo struct {
-	Certificates []CertInfo `json:"certificates" yaml:"certificates"`
+	Certificates      []CertInfo `json:"certificates" yaml:"certificates"`
+	Verified          bool       `json:"verified" yaml:"verified"`
+	VerificationError string     `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
 }
 
 // TLSConfig allows customizing the TLS configuration for testing.
@@ -66,39 +69,19 @@ var TLSConfig *tls.Config
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	Insecure   bool   // Skip certificate verification
 	CACertFile string // Path to custom CA certificate file (PEM format)
 	Proxy      string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
 }
 
 // Query connects to the given endpoint and retrieves certificate chain information.
 func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
-	config := TLSConfig
-	if config == nil {
-		config = &tls.Config{}
-	} else {
-		config = config.Clone()
-	}
-
-	if len(opts) > 0 {
-		if opts[0].Insecure {
-			config.InsecureSkipVerify = true
-		}
-		if opts[0].CACertFile != "" {
-			caCert, err := os.ReadFile(opts[0].CACertFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read CA certificate: %w", err)
-			}
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM(caCert) {
-				return nil, fmt.Errorf("failed to parse CA certificate")
-			}
-			config.RootCAs = caCertPool
-		}
+	config, err := buildConfig(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	host, _, _ := net.SplitHostPort(endpoint)
-	if config.ServerName == "" && host != "" && net.ParseIP(host) == nil {
+	if config.ServerName == "" && host != "" {
 		config.ServerName = host
 	}
 
@@ -107,7 +90,57 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
 
+	verifiedConfig := config.Clone()
+	verifiedConfig.InsecureSkipVerify = false
+	certs, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig)
+	if err != nil {
+		var cve *tls.CertificateVerificationError
+		if !errors.As(err, &cve) {
+			return nil, fmt.Errorf("TLS handshake failed: %w", err)
+		}
+		fallbackConfig := config.Clone()
+		fallbackConfig.InsecureSkipVerify = true
+		certs, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig)
+		if err2 != nil {
+			return nil, fmt.Errorf("TLS handshake failed: %w", err)
+		}
+		chain := buildChain(certs)
+		chain.Verified = false
+		chain.VerificationError = abbreviateVerifyError(cve.Err)
+		return chain, nil
+	}
+
+	chain := buildChain(certs)
+	chain.Verified = true
+	return chain, nil
+}
+
+func buildConfig(opts []QueryOptions) (*tls.Config, error) {
+	config := TLSConfig
+	if config == nil {
+		config = &tls.Config{}
+	} else {
+		config = config.Clone()
+	}
+
+	if len(opts) > 0 && opts[0].CACertFile != "" {
+		caCert, err := os.ReadFile(opts[0].CACertFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+		config.RootCAs = caCertPool
+	}
+
+	return config, nil
+}
+
+func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([]*x509.Certificate, error) {
 	var rawConn net.Conn
+	var err error
 	if proxyURL != nil {
 		rawConn, err = dialViaProxy(endpoint, proxyURL, 10*time.Second)
 	} else {
@@ -120,7 +153,7 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 	conn := tls.Client(rawConn, config)
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
-		return nil, fmt.Errorf("TLS handshake failed: %w", err)
+		return nil, err
 	}
 	defer conn.Close()
 
@@ -129,18 +162,49 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("no certificate returned by server")
 	}
 
+	return certs, nil
+}
+
+func buildChain(certs []*x509.Certificate) *ChainInfo {
 	chain := &ChainInfo{
 		Certificates: make([]CertInfo, 0, len(certs)),
 	}
-
 	for i, cert := range certs {
 		chain.Certificates = append(chain.Certificates, CertInfoFromCert(cert))
 		if i == 0 {
 			chain.Certificates[i].Type = "leaf"
 		}
 	}
+	return chain
+}
 
-	return chain, nil
+func abbreviateVerifyError(err error) string {
+	var hostErr x509.HostnameError
+	if errors.As(err, &hostErr) {
+		return "hostname mismatch"
+	}
+	var unknownAuth x509.UnknownAuthorityError
+	if errors.As(err, &unknownAuth) {
+		return "unknown authority"
+	}
+	var certInvalid x509.CertificateInvalidError
+	if errors.As(err, &certInvalid) {
+		switch certInvalid.Reason {
+		case x509.Expired:
+			return "certificate expired"
+		case x509.NotAuthorizedToSign:
+			return "not authorized to sign"
+		case x509.NameMismatch:
+			return "name mismatch"
+		default:
+			return "invalid certificate"
+		}
+	}
+	var sysRoots x509.SystemRootsError
+	if errors.As(err, &sysRoots) {
+		return "system roots unavailable"
+	}
+	return strings.TrimPrefix(err.Error(), "x509: ")
 }
 
 func certType(index int, cert *x509.Certificate) string {

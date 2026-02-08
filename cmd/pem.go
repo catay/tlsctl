@@ -29,8 +29,7 @@ func newPemCmd() *cobra.Command {
 			}
 
 			renderOpts := output.Options{
-				Insecure: false,
-				Now:      time.Now,
+				Now: time.Now,
 			}
 			return renderer.Render(os.Stdout, chainInfo, renderOpts)
 		},

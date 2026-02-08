@@ -12,8 +12,12 @@ import (
 type VerboseTextRenderer struct{}
 
 func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
-	if opts.Insecure {
-		fmt.Fprintf(w, "%s Certificate verification was skipped (insecure mode)\n\n", color.YellowString("⚠"))
+	if !chain.Verified {
+		reason := chain.VerificationError
+		if reason == "" {
+			reason = "unverified"
+		}
+		fmt.Fprintf(w, "%s Certificate verification failed: %s\n\n", color.YellowString("⚠"), reason)
 	}
 	for i, cert := range chain.Certificates {
 		if i > 0 {

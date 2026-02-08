@@ -12,8 +12,7 @@ type Renderer interface {
 }
 
 type Options struct {
-	Insecure bool
-	Now      func() time.Time
+	Now func() time.Time
 }
 
 func (o Options) NowFunc() time.Time {

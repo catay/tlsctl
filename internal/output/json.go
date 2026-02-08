@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 type JSONRenderer struct{}

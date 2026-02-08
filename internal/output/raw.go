@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 type RawPEMRenderer struct{}

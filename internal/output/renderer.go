@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 type Renderer interface {

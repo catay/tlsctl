@@ -1,4 +1,4 @@
-module github.com/tlsctl
+module github.com/catay/tlsctl
 
 go 1.25
 

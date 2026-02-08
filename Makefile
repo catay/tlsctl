@@ -11,6 +11,9 @@ test:
 lint:
 	golangci-lint run ./...
 
+fmt:
+	gofmt -s -w -l .
+
 clean:
 	rm -rf $(BINARY) dist
 	go clean

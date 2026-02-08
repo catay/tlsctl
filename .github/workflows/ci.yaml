@@ -23,6 +23,24 @@ jobs:
         with:
           version: v2.8.0
 
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Check formatting
+        run: |
+          output=$(gofmt -s -l .)
+          if [ -n "$output" ]; then
+            echo "The following files are not formatted:"
+            echo "$output"
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
     steps:

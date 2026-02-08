@@ -49,7 +49,9 @@ gh pr create --title "<commit-message>" --body "<pr-description>" --base main
 
 ### 5. Wait for CI
 
-Run `scripts/wait-for-ci.sh` to poll the CI status of the PR. The script waits up to 10 minutes, checking every 30 seconds.
+Before waiting, check the CI workflow path filters in `.github/workflows/ci.yaml`. If none of the changed files match the paths listed in the `on.pull_request.paths` filter, skip waiting and proceed directly to merge.
+
+Otherwise, run `scripts/wait-for-ci.sh` to poll the CI status of the PR. The script waits up to 10 minutes, checking every 30 seconds.
 
 - If CI passes, proceed to merge
 - If CI fails, stop and report the failure to the user. Do NOT merge.

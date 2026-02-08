@@ -11,7 +11,9 @@ func (c *ChainInfo) Leaf() (*CertInfo, error) {
 
 func (c *ChainInfo) WithoutPEM() *ChainInfo {
 	out := &ChainInfo{
-		Certificates: make([]CertInfo, len(c.Certificates)),
+		Certificates:      make([]CertInfo, len(c.Certificates)),
+		Verified:          c.Verified,
+		VerificationError: c.VerificationError,
 	}
 	for i := range c.Certificates {
 		out.Certificates[i] = c.Certificates[i]

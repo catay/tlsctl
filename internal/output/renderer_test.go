@@ -71,6 +71,7 @@ func TestNewFactory(t *testing.T) {
 
 func TestJSONRenderer(t *testing.T) {
 	chain := testChain()
+	chain.Verified = true
 	var buf bytes.Buffer
 	r := JSONRenderer{}
 
@@ -94,6 +95,7 @@ func TestJSONRenderer(t *testing.T) {
 
 func TestYAMLRenderer(t *testing.T) {
 	chain := testChain()
+	chain.Verified = true
 	var buf bytes.Buffer
 	r := YAMLRenderer{}
 
@@ -117,6 +119,7 @@ func TestYAMLRenderer(t *testing.T) {
 
 func TestRawPEMRenderer(t *testing.T) {
 	chain := testChain()
+	chain.Verified = true
 	var buf bytes.Buffer
 	r := RawPEMRenderer{}
 
@@ -132,6 +135,7 @@ func TestRawPEMRenderer(t *testing.T) {
 
 func TestHumanRenderer(t *testing.T) {
 	chain := testChain()
+	chain.Verified = true
 	var buf bytes.Buffer
 	r := HumanRenderer{}
 
@@ -147,6 +151,9 @@ func TestHumanRenderer(t *testing.T) {
 	if !strings.Contains(output, "Subject:") {
 		t.Error("expected Subject in output")
 	}
+	if !strings.Contains(output, "secure") {
+		t.Error("expected secure label in output")
+	}
 	if !strings.Contains(output, "expires in") {
 		t.Error("expected expiry info in output")
 	}
@@ -154,22 +161,28 @@ func TestHumanRenderer(t *testing.T) {
 
 func TestHumanRendererInsecure(t *testing.T) {
 	chain := testChain()
+	chain.Verified = false
+	chain.VerificationError = "unknown authority"
 	var buf bytes.Buffer
 	r := HumanRenderer{}
 
-	err := r.Render(&buf, chain, Options{Insecure: true, Now: fixedNow})
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Render failed: %v", err)
 	}
 
 	output := buf.String()
 	if !strings.Contains(output, "insecure") {
-		t.Error("expected insecure warning in output")
+		t.Error("expected insecure label in output")
+	}
+	if !strings.Contains(output, "unknown authority") {
+		t.Error("expected unknown authority warning in output")
 	}
 }
 
 func TestVerboseTextRenderer(t *testing.T) {
 	chain := testChain()
+	chain.Verified = true
 	var buf bytes.Buffer
 	r := VerboseTextRenderer{}
 
@@ -192,16 +205,18 @@ func TestVerboseTextRenderer(t *testing.T) {
 
 func TestVerboseTextRendererInsecure(t *testing.T) {
 	chain := testChain()
+	chain.Verified = false
+	chain.VerificationError = "unknown authority"
 	var buf bytes.Buffer
 	r := VerboseTextRenderer{}
 
-	err := r.Render(&buf, chain, Options{Insecure: true, Now: fixedNow})
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Render failed: %v", err)
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "insecure mode") {
-		t.Error("expected insecure mode warning in output")
+	if !strings.Contains(output, "verification failed") {
+		t.Error("expected verification failed warning in output")
 	}
 }

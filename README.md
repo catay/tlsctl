@@ -55,9 +55,8 @@ tlsctl client -o yaml example.com
 # Raw PEM-encoded certificates
 tlsctl client -o raw example.com
 
-# Skip certificate verification (for self-signed or untrusted certs)
-tlsctl client --insecure example.com
-tlsctl client -k example.com
+# Use a custom CA certificate (e.g. for private CAs)
+tlsctl client --cacert /path/to/ca.pem example.com
 ```
 
 ### Parse PEM files
@@ -116,7 +115,7 @@ The tool extracts and displays:
 ### Default (brief human-readable)
 
 ```
-✓ *.google.com (expires in 89 days)
+*.google.com (secure, expires in 89 days) ✓
   Subject:  CN=*.google.com
   Issuer:   CN=WR2,O=Google Trust Services,C=US
   Validity: 2025-12-09 → 2026-03-03
@@ -126,9 +125,9 @@ The tool extracts and displays:
 ```
 
 Status indicators:
-- `✓` - Certificate is valid
-- `⚠` - Certificate expires within 30 days, or queried with `--insecure`
-- `✗` - Certificate has expired
+- `✓` **secure** (green) - Certificate is valid and verified
+- `⚠` **secure** (yellow) - Certificate is verified but expires within 30 days
+- `✗` **insecure** (red) - Certificate verification failed (with abbreviated reason, e.g. unknown authority, hostname mismatch)
 
 ### Text (verbose)
 
@@ -183,7 +182,8 @@ Version:               3
         "sha256": "12:34:56:..."
       }
     }
-  ]
+  ],
+  "verified": true
 }
 ```
 
@@ -210,4 +210,5 @@ certificates:
     fingerprint:
       sha1: "ab:cd:ef:..."
       sha256: "12:34:56:..."
+verified: true
 ```

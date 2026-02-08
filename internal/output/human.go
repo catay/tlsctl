@@ -32,18 +32,25 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	bold := color.New(color.Bold)
 	var status, statusMsg string
 	switch {
+	case !chain.Verified:
+		status = bold.Add(color.FgRed).Sprint("✗")
+		reason := chain.VerificationError
+		if reason == "" {
+			reason = "unverified"
+		}
+		label := color.New(color.Bold, color.FgRed).Sprint("insecure")
+		statusMsg = fmt.Sprintf("%s, %s, expires in %d days", label, reason, daysUntilExpiry)
 	case now.After(notAfter):
 		status = bold.Add(color.FgRed).Sprint("✗")
 		statusMsg = "expired"
-	case opts.Insecure:
-		status = bold.Add(color.FgYellow).Sprint("⚠")
-		statusMsg = fmt.Sprintf("insecure, expires in %d days", daysUntilExpiry)
 	case daysUntilExpiry <= 30:
 		status = bold.Add(color.FgYellow).Sprint("⚠")
-		statusMsg = fmt.Sprintf("expires in %d days", daysUntilExpiry)
+		label := color.New(color.Bold, color.FgYellow).Sprint("secure")
+		statusMsg = fmt.Sprintf("%s, expires in %d days", label, daysUntilExpiry)
 	default:
 		status = bold.Add(color.FgGreen).Sprint("✓")
-		statusMsg = fmt.Sprintf("expires in %d days", daysUntilExpiry)
+		label := color.New(color.Bold, color.FgGreen).Sprint("secure")
+		statusMsg = fmt.Sprintf("%s, expires in %d days", label, daysUntilExpiry)
 	}
 
 	displayName := leaf.DisplayName()

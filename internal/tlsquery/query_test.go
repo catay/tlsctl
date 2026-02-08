@@ -295,7 +295,7 @@ func handleProxyConnection(conn net.Conn, targetAddr string, requireAuth bool) {
 	fmt.Fprint(conn, "HTTP/1.1 200 Connection established\r\n\r\n")
 
 	go io.Copy(target, br) //nolint:errcheck
-	io.Copy(conn, target) //nolint:errcheck
+	io.Copy(conn, target)  //nolint:errcheck
 }
 
 func TestQuery_ViaProxy(t *testing.T) {

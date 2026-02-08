@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/fatih/color"
 )
 
 type VerboseTextRenderer struct{}

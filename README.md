@@ -79,6 +79,9 @@ tlsctl pem -o yaml cert.pem
 
 # Raw PEM output
 tlsctl pem -o raw cert.pem
+
+# Use a custom CA certificate (e.g. for private CAs)
+tlsctl pem --cacert /path/to/ca.pem cert.pem
 ```
 
 ## Output Formats

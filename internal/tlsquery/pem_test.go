@@ -1,6 +1,8 @@
 package tlsquery
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,6 +116,31 @@ func TestParsePEM(t *testing.T) {
 	}
 }
 
+func TestParsePEMVerification(t *testing.T) {
+	t.Run("self-signed cert is unverified", func(t *testing.T) {
+		chain, err := ParsePEM([]byte(testCertPEM))
+		if err != nil {
+			t.Fatalf("ParsePEM() unexpected error: %v", err)
+		}
+		if chain.Verified {
+			t.Error("expected Verified=false for self-signed test cert")
+		}
+		if chain.VerificationError == "" {
+			t.Error("expected VerificationError to be set")
+		}
+	})
+
+	t.Run("leaf type is set", func(t *testing.T) {
+		chain, err := ParsePEM([]byte(testCertPEM + "\n" + testCACertPEM))
+		if err != nil {
+			t.Fatalf("ParsePEM() unexpected error: %v", err)
+		}
+		if chain.Certificates[0].Type != "leaf" {
+			t.Errorf("expected first cert type=leaf, got %q", chain.Certificates[0].Type)
+		}
+	})
+}
+
 func TestParsePEMFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -165,11 +192,16 @@ func TestParsePEMFile(t *testing.T) {
 }
 
 func TestCertTypeFromCert(t *testing.T) {
-	chain, err := ParsePEM([]byte(testCACertPEM))
+	block, _ := pem.Decode([]byte(testCACertPEM))
+	if block == nil {
+		t.Fatal("failed to decode PEM block")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if chain.Certificates[0].Type != "root" {
-		t.Errorf("expected root type for self-signed CA, got %q", chain.Certificates[0].Type)
+	got := CertTypeFromCert(cert)
+	if got != "root" {
+		t.Errorf("expected root type for self-signed CA, got %q", got)
 	}
 }

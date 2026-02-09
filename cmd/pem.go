@@ -11,6 +11,7 @@ import (
 
 func newPemCmd() *cobra.Command {
 	var outputFormat string
+	var caCertFile string
 
 	cmd := &cobra.Command{
 		Use:   "pem FILE",
@@ -18,7 +19,8 @@ func newPemCmd() *cobra.Command {
 		Long:  `Reads a PEM file and displays certificate metadata for all certificates found.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			chainInfo, err := tlsquery.ParsePEMFile(args[0])
+			opts := tlsquery.PEMOptions{CACertFile: caCertFile}
+			chainInfo, err := tlsquery.ParsePEMFile(args[0], opts)
 			if err != nil {
 				return err
 			}
@@ -36,6 +38,7 @@ func newPemCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
+	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 
 	return cmd
 }

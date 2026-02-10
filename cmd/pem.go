@@ -12,6 +12,7 @@ import (
 func newPemCmd() *cobra.Command {
 	var outputFormat string
 	var caCertFile string
+	var rf revocationFlags
 
 	cmd := &cobra.Command{
 		Use:   "pem FILE",
@@ -23,6 +24,10 @@ func newPemCmd() *cobra.Command {
 			chainInfo, err := tlsquery.ParsePEMFile(args[0], opts)
 			if err != nil {
 				return err
+			}
+
+			if rf.mode != "off" && rf.mode != "" {
+				runRevocationCheck(chainInfo, rf.mode, rf.timeout, rf.softFail)
 			}
 
 			renderer, err := output.New(output.Format(outputFormat))
@@ -39,6 +44,7 @@ func newPemCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
+	addRevocationFlags(cmd, &rf)
 
 	return cmd
 }

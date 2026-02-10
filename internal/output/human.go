@@ -72,6 +72,11 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 		}
 	}
 
+	if leaf.Revocation != nil {
+		revLabel := formatRevocationLabel(leaf.Revocation.OverallStatus)
+		fmt.Fprintf(w, "  Revocation: %s\n", revLabel)
+	}
+
 	if len(chain.Certificates) > 1 {
 		fmt.Fprintln(w)
 		chainNames := chain.ChainNames()
@@ -80,4 +85,21 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	}
 
 	return nil
+}
+
+func formatRevocationLabel(status string) string {
+	switch status {
+	case "good":
+		return color.GreenString("not revoked") + " (crl)"
+	case "revoked":
+		return color.RedString("REVOKED") + " (crl)"
+	case "unknown":
+		return color.YellowString("unknown")
+	case "not_checked":
+		return "not checked"
+	case "error":
+		return color.RedString("error")
+	default:
+		return status
+	}
 }

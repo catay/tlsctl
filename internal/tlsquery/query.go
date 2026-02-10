@@ -16,33 +16,36 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/catay/tlsctl/internal/revocation"
 )
 
 // CertInfo holds the extracted certificate metadata.
 type CertInfo struct {
-	Type               string            `json:"type" yaml:"type"`
-	Version            int               `json:"version" yaml:"version"`
-	SerialNumber       string            `json:"serial_number" yaml:"serial_number"`
-	SignatureAlgorithm string            `json:"signature_algorithm" yaml:"signature_algorithm"`
-	Issuer             string            `json:"issuer" yaml:"issuer"`
-	Subject            string            `json:"subject" yaml:"subject"`
-	CommonName         string            `json:"common_name" yaml:"common_name"`
-	NotBefore          string            `json:"not_before" yaml:"not_before"`
-	NotAfter           string            `json:"not_after" yaml:"not_after"`
-	PublicKeyAlgorithm string            `json:"public_key_algorithm" yaml:"public_key_algorithm"`
-	KeyUsage           []string          `json:"key_usage,omitempty" yaml:"key_usage,omitempty"`
-	ExtKeyUsage        []string          `json:"extended_key_usage,omitempty" yaml:"extended_key_usage,omitempty"`
-	BasicConstraints   *BasicConstraints `json:"basic_constraints,omitempty" yaml:"basic_constraints,omitempty"`
-	SubjectKeyID       string            `json:"subject_key_id,omitempty" yaml:"subject_key_id,omitempty"`
-	AuthorityKeyID     string            `json:"authority_key_id,omitempty" yaml:"authority_key_id,omitempty"`
-	SubjectAltNames    []string          `json:"subject_alternative_names,omitempty" yaml:"subject_alternative_names,omitempty"`
-	EmailAddresses     []string          `json:"email_addresses,omitempty" yaml:"email_addresses,omitempty"`
-	IPAddresses        []string          `json:"ip_addresses,omitempty" yaml:"ip_addresses,omitempty"`
-	OCSPServers        []string          `json:"ocsp_servers,omitempty" yaml:"ocsp_servers,omitempty"`
-	IssuingCertURL     []string          `json:"issuing_cert_url,omitempty" yaml:"issuing_cert_url,omitempty"`
-	CRLDistPoints      []string          `json:"crl_distribution_points,omitempty" yaml:"crl_distribution_points,omitempty"`
-	Fingerprint        Fingerprint       `json:"fingerprint" yaml:"fingerprint"`
-	PEM                string            `json:"pem,omitempty" yaml:"pem,omitempty"`
+	Type               string                     `json:"type" yaml:"type"`
+	Version            int                        `json:"version" yaml:"version"`
+	SerialNumber       string                     `json:"serial_number" yaml:"serial_number"`
+	SignatureAlgorithm string                     `json:"signature_algorithm" yaml:"signature_algorithm"`
+	Issuer             string                     `json:"issuer" yaml:"issuer"`
+	Subject            string                     `json:"subject" yaml:"subject"`
+	CommonName         string                     `json:"common_name" yaml:"common_name"`
+	NotBefore          string                     `json:"not_before" yaml:"not_before"`
+	NotAfter           string                     `json:"not_after" yaml:"not_after"`
+	PublicKeyAlgorithm string                     `json:"public_key_algorithm" yaml:"public_key_algorithm"`
+	KeyUsage           []string                   `json:"key_usage,omitempty" yaml:"key_usage,omitempty"`
+	ExtKeyUsage        []string                   `json:"extended_key_usage,omitempty" yaml:"extended_key_usage,omitempty"`
+	BasicConstraints   *BasicConstraints          `json:"basic_constraints,omitempty" yaml:"basic_constraints,omitempty"`
+	SubjectKeyID       string                     `json:"subject_key_id,omitempty" yaml:"subject_key_id,omitempty"`
+	AuthorityKeyID     string                     `json:"authority_key_id,omitempty" yaml:"authority_key_id,omitempty"`
+	SubjectAltNames    []string                   `json:"subject_alternative_names,omitempty" yaml:"subject_alternative_names,omitempty"`
+	EmailAddresses     []string                   `json:"email_addresses,omitempty" yaml:"email_addresses,omitempty"`
+	IPAddresses        []string                   `json:"ip_addresses,omitempty" yaml:"ip_addresses,omitempty"`
+	OCSPServers        []string                   `json:"ocsp_servers,omitempty" yaml:"ocsp_servers,omitempty"`
+	IssuingCertURL     []string                   `json:"issuing_cert_url,omitempty" yaml:"issuing_cert_url,omitempty"`
+	CRLDistPoints      []string                   `json:"crl_distribution_points,omitempty" yaml:"crl_distribution_points,omitempty"`
+	Fingerprint        Fingerprint                `json:"fingerprint" yaml:"fingerprint"`
+	PEM                string                     `json:"pem,omitempty" yaml:"pem,omitempty"`
+	Revocation         *revocation.RevocationInfo `json:"revocation,omitempty" yaml:"revocation,omitempty"`
 }
 
 // Fingerprint holds SHA1 and SHA256 fingerprints of a certificate.
@@ -92,7 +95,7 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 
 	verifiedConfig := config.Clone()
 	verifiedConfig.InsecureSkipVerify = false
-	certs, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig)
+	certs, _, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig)
 	if err != nil {
 		var cve *tls.CertificateVerificationError
 		if !errors.As(err, &cve) {
@@ -100,7 +103,7 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		}
 		fallbackConfig := config.Clone()
 		fallbackConfig.InsecureSkipVerify = true
-		certs, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig)
+		certs, _, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig)
 		if err2 != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
 		}
@@ -138,7 +141,7 @@ func buildConfig(opts []QueryOptions) (*tls.Config, error) {
 	return config, nil
 }
 
-func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([]*x509.Certificate, error) {
+func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([]*x509.Certificate, []byte, error) {
 	var rawConn net.Conn
 	var err error
 	if proxyURL != nil {
@@ -147,22 +150,23 @@ func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([
 		rawConn, err = (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", endpoint)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("connection failed: %w", err)
+		return nil, nil, fmt.Errorf("connection failed: %w", err)
 	}
 
 	conn := tls.Client(rawConn, config)
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	defer conn.Close()
 
-	certs := conn.ConnectionState().PeerCertificates
+	state := conn.ConnectionState()
+	certs := state.PeerCertificates
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("no certificate returned by server")
+		return nil, nil, fmt.Errorf("no certificate returned by server")
 	}
 
-	return certs, nil
+	return certs, state.OCSPResponse, nil
 }
 
 func buildChain(certs []*x509.Certificate) *ChainInfo {

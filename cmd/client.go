@@ -1,19 +1,36 @@
 package cmd
 
 import (
+	"crypto/x509"
+	"encoding/pem"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/catay/tlsctl/internal/cli"
 	"github.com/catay/tlsctl/internal/output"
+	"github.com/catay/tlsctl/internal/revocation"
 	"github.com/catay/tlsctl/internal/tlsquery"
 	"github.com/spf13/cobra"
 )
+
+type revocationFlags struct {
+	mode     string
+	timeout  time.Duration
+	softFail bool
+}
+
+func addRevocationFlags(cmd *cobra.Command, rf *revocationFlags) {
+	cmd.Flags().StringVar(&rf.mode, "revocation", "off", "Revocation check mode: off, crl")
+	cmd.Flags().DurationVar(&rf.timeout, "revocation-timeout", 5*time.Second, "Timeout for revocation checks")
+	cmd.Flags().BoolVar(&rf.softFail, "revocation-soft-fail", true, "Treat revocation check errors as unknown (soft-fail)")
+}
 
 func newClientCmd() *cobra.Command {
 	var outputFormat string
 	var caCertFile string
 	var proxyURL string
+	var rf revocationFlags
 
 	cmd := &cobra.Command{
 		Use:   "client FQDN[:PORT]",
@@ -32,6 +49,10 @@ func newClientCmd() *cobra.Command {
 				return err
 			}
 
+			if rf.mode != "off" && rf.mode != "" {
+				runRevocationCheck(certInfo, rf.mode, rf.timeout, rf.softFail)
+			}
+
 			renderer, err := output.New(output.Format(outputFormat))
 			if err != nil {
 				return err
@@ -47,8 +68,58 @@ func newClientCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
+	addRevocationFlags(cmd, &rf)
 
 	return cmd
+}
+
+func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Duration, softFail bool) {
+	if len(chain.Certificates) == 0 {
+		return
+	}
+
+	leaf := parseCertPEM(chain.Certificates[0].PEM)
+	if leaf == nil {
+		return
+	}
+
+	var issuer *x509.Certificate
+	if len(chain.Certificates) > 1 {
+		issuer = parseCertPEM(chain.Certificates[1].PEM)
+	}
+
+	var methods []revocation.Method
+	switch mode {
+	case "crl":
+		methods = []revocation.Method{revocation.MethodCRL}
+	default:
+		methods = []revocation.Method{revocation.MethodCRL}
+	}
+
+	checker := revocation.NewChecker(&http.Client{Timeout: timeout}, nil)
+	opts := revocation.Options{
+		Methods:  methods,
+		Timeout:  timeout,
+		SoftFail: softFail,
+	}
+
+	result := checker.CheckCert(leaf, issuer, opts)
+	chain.Certificates[0].Revocation = result
+}
+
+func parseCertPEM(pemData string) *x509.Certificate {
+	if pemData == "" {
+		return nil
+	}
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		return nil
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil
+	}
+	return cert
 }
 
 func init() {

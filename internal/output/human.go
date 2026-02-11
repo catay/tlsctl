@@ -73,7 +73,11 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	}
 
 	if leaf.Revocation != nil {
-		revLabel := formatRevocationLabel(leaf.Revocation.OverallStatus)
+		method := ""
+		if len(leaf.Revocation.Results) > 0 {
+			method = leaf.Revocation.Results[0].Method
+		}
+		revLabel := formatRevocationLabel(leaf.Revocation.OverallStatus, method)
 		fmt.Fprintf(w, "  Revocation: %s\n", revLabel)
 	}
 
@@ -87,18 +91,22 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	return nil
 }
 
-func formatRevocationLabel(status string) string {
+func formatRevocationLabel(status, method string) string {
+	suffix := ""
+	if method != "" {
+		suffix = " (" + strings.ToUpper(method) + ")"
+	}
 	switch status {
 	case "good":
-		return color.GreenString("not revoked") + " (crl)"
+		return color.GreenString("not revoked") + suffix
 	case "revoked":
-		return color.RedString("REVOKED") + " (crl)"
+		return color.RedString("REVOKED") + suffix
 	case "unknown":
-		return color.YellowString("unknown")
+		return color.YellowString("unknown") + suffix
 	case "not_checked":
 		return "not checked"
 	case "error":
-		return color.RedString("error")
+		return color.RedString("error") + suffix
 	default:
 		return status
 	}

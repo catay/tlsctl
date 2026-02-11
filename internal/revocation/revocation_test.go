@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ocsp"
 )
 
 func newCA(t *testing.T) (*x509.Certificate, *ecdsa.PrivateKey) {
@@ -100,6 +102,57 @@ func createCRL(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, revo
 	}
 
 	return crlBytes
+}
+
+func newLeafWithOCSP(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, ocspServers []string) (*x509.Certificate, *ecdsa.PrivateKey) {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate leaf key: %v", err)
+	}
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(42),
+		Subject:      pkix.Name{CommonName: "leaf.example.com"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		OCSPServer:   ocspServers,
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca, &key.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("create leaf cert: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("parse leaf cert: %v", err)
+	}
+
+	return cert, key
+}
+
+func createOCSPResponse(t *testing.T, leaf, issuer *x509.Certificate, issuerKey *ecdsa.PrivateKey, tmpl ocsp.Response) []byte {
+	t.Helper()
+
+	der, err := ocsp.CreateResponse(issuer, issuer, tmpl, issuerKey)
+	if err != nil {
+		t.Fatalf("create OCSP response: %v", err)
+	}
+
+	return der
+}
+
+func serveOCSP(t *testing.T, respBytes []byte) *httptest.Server {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/ocsp-response")
+		_, _ = w.Write(respBytes)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
 }
 
 func TestCheckCRL_NotRevoked(t *testing.T) {
@@ -309,6 +362,169 @@ func TestComputeOverallStatus(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
 		})
+	}
+}
+
+func TestCheckOCSP_NotRevoked(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://placeholder"})
+
+	respBytes := createOCSPResponse(t, leaf, ca, caKey, ocsp.Response{
+		SerialNumber: leaf.SerialNumber,
+		Status:       ocsp.Good,
+		ThisUpdate:   time.Now().Add(-time.Hour),
+		NextUpdate:   time.Now().Add(24 * time.Hour),
+	})
+	srv := serveOCSP(t, respBytes)
+
+	leaf, _ = newLeafWithOCSP(t, ca, caKey, []string{srv.URL})
+
+	checker := NewChecker(srv.Client(), time.Now)
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+
+	if info.OverallStatus != string(StatusGood) {
+		t.Errorf("expected overall status %q, got %q", StatusGood, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	if info.Results[0].Status != string(StatusGood) {
+		t.Errorf("expected result status %q, got %q", StatusGood, info.Results[0].Status)
+	}
+}
+
+func TestCheckOCSP_Revoked(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://placeholder"})
+
+	revokedAt := time.Now().Add(-2 * time.Hour).UTC().Truncate(time.Second)
+	respBytes := createOCSPResponse(t, leaf, ca, caKey, ocsp.Response{
+		SerialNumber:     leaf.SerialNumber,
+		Status:           ocsp.Revoked,
+		ThisUpdate:       time.Now().Add(-time.Hour),
+		NextUpdate:       time.Now().Add(24 * time.Hour),
+		RevokedAt:        revokedAt,
+		RevocationReason: 1,
+	})
+	srv := serveOCSP(t, respBytes)
+
+	leaf, _ = newLeafWithOCSP(t, ca, caKey, []string{srv.URL})
+
+	checker := NewChecker(srv.Client(), time.Now)
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+
+	if info.OverallStatus != string(StatusRevoked) {
+		t.Errorf("expected overall status %q, got %q", StatusRevoked, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	r := info.Results[0]
+	if r.Status != string(StatusRevoked) {
+		t.Errorf("expected result status %q, got %q", StatusRevoked, r.Status)
+	}
+	if r.RevokedAt == "" {
+		t.Error("expected RevokedAt to be set")
+	}
+	if r.Reason != "key compromise" {
+		t.Errorf("expected reason %q, got %q", "key compromise", r.Reason)
+	}
+}
+
+func TestCheckOCSP_NoOCSPServer(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, nil)
+
+	checker := NewChecker(http.DefaultClient, time.Now)
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+
+	if info.OverallStatus != string(StatusUnknown) {
+		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	if info.Results[0].Status != string(StatusNotChecked) {
+		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
+	}
+}
+
+func TestCheckOCSP_NoIssuer(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://ocsp.example.com"})
+
+	checker := NewChecker(http.DefaultClient, time.Now)
+	info := checker.CheckCert(leaf, nil, Options{Methods: []Method{MethodOCSP}})
+
+	if info.OverallStatus != string(StatusUnknown) {
+		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	if info.Results[0].Status != string(StatusNotChecked) {
+		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
+	}
+}
+
+func TestCheckOCSP_FetchError(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://127.0.0.1:1/ocsp"})
+
+	checker := NewChecker(http.DefaultClient, time.Now)
+	info := checker.CheckCert(leaf, ca, Options{
+		Methods:  []Method{MethodOCSP},
+		SoftFail: true,
+		Timeout:  500 * time.Millisecond,
+	})
+
+	if info.OverallStatus != string(StatusError) {
+		t.Errorf("expected overall status %q, got %q", StatusError, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	if info.Results[0].Status != string(StatusError) {
+		t.Errorf("expected result status %q, got %q", StatusError, info.Results[0].Status)
+	}
+	if info.Results[0].Error == "" {
+		t.Error("expected error message to be set")
+	}
+}
+
+func TestCheckOCSP_StaleResponse(t *testing.T) {
+	ca, caKey := newCA(t)
+	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://placeholder"})
+
+	staleNextUpdate := time.Now().Add(-time.Hour)
+	respBytes := createOCSPResponse(t, leaf, ca, caKey, ocsp.Response{
+		SerialNumber: leaf.SerialNumber,
+		Status:       ocsp.Good,
+		ThisUpdate:   staleNextUpdate.Add(-time.Hour),
+		NextUpdate:   staleNextUpdate,
+	})
+	srv := serveOCSP(t, respBytes)
+
+	leaf, _ = newLeafWithOCSP(t, ca, caKey, []string{srv.URL})
+
+	checker := NewChecker(srv.Client(), time.Now)
+	info := checker.CheckCert(leaf, ca, Options{
+		Methods:  []Method{MethodOCSP},
+		SoftFail: true,
+	})
+
+	if info.OverallStatus != string(StatusUnknown) {
+		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
+	}
+	if len(info.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(info.Results))
+	}
+	r := info.Results[0]
+	if r.Status != string(StatusUnknown) {
+		t.Errorf("expected result status %q, got %q", StatusUnknown, r.Status)
+	}
+	if r.Error != "stale OCSP response: past NextUpdate time" {
+		t.Errorf("expected stale error, got %q", r.Error)
 	}
 }
 

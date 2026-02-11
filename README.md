@@ -57,7 +57,13 @@ tlsctl client -o raw example.com
 
 # Use a custom CA certificate (e.g. for private CAs)
 tlsctl client --cacert /path/to/ca.pem example.com
+
+# Connect through an HTTP proxy (-x is the short form)
+tlsctl client --proxy http://proxy:8080 example.com
+tlsctl client -x http://proxy:8080 example.com
 ```
+
+The `--proxy` flag falls back to `HTTPS_PROXY` / `HTTP_PROXY` environment variables if not set.
 
 ### Parse PEM files
 
@@ -84,6 +90,12 @@ tlsctl pem -o raw cert.pem
 tlsctl pem --cacert /path/to/ca.pem cert.pem
 ```
 
+### Version
+
+```bash
+tlsctl version
+```
+
 ## Output Formats
 
 - (default) - Brief human-readable summary with expiry status
@@ -91,6 +103,40 @@ tlsctl pem --cacert /path/to/ca.pem cert.pem
 - `json` - Full structured JSON format
 - `yaml` - Full structured YAML format
 - `raw` - PEM-encoded certificates
+
+## Revocation Checking
+
+Both `client` and `pem` subcommands support certificate revocation checking via the `--revocation` flag.
+
+### Modes
+
+- `off` (default) - No revocation checking
+- `crl` - Check against Certificate Revocation Lists
+- `ocsp` - Check via Online Certificate Status Protocol
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--revocation` | `off` | Revocation check mode (`off`, `crl`, `ocsp`) |
+| `--revocation-timeout` | `5s` | Timeout for revocation requests |
+| `--revocation-soft-fail` | `true` | Treat unreachable revocation endpoints as non-fatal |
+
+### Examples
+
+```bash
+# Check revocation via CRL
+tlsctl client --revocation crl example.com
+
+# Check revocation via OCSP
+tlsctl client --revocation ocsp example.com
+
+# OCSP check with custom timeout
+tlsctl client --revocation ocsp --revocation-timeout 10s example.com
+
+# Revocation check on PEM file
+tlsctl pem --revocation ocsp cert.pem
+```
 
 ## Certificate Fields
 
@@ -109,7 +155,8 @@ The tool extracts and displays:
 - **Subject/Authority Key ID**: Key identifiers (hex formatted)
 - **Subject Alt Names**: DNS names
 - **Email Addresses / IP Addresses**: Additional identifiers
-- **OCSP Servers / CA Issuers / CRL Distribution Points**: Revocation info
+- **OCSP Servers / CA Issuers / CRL Distribution Points**: Revocation endpoints
+- **Revocation Status**: Result of CRL or OCSP revocation check (when `--revocation` is enabled)
 - **Fingerprint**: SHA1 and SHA256 fingerprints
 - **PEM**: The certificate in PEM format (use `-o raw` to output)
 
@@ -123,6 +170,7 @@ The tool extracts and displays:
   Issuer:   CN=WR2,O=Google Trust Services,C=US
   Validity: 2025-12-09 → 2026-03-03
   SANs:     *.google.com, *.appengine.google.com, *.cloud.google.com (+135 more)
+  Revocation: not revoked (OCSP)
 
   Chain: *.google.com → WR2 → GTS Root R1 (3 certificates)
 ```
@@ -151,6 +199,12 @@ Authority Key ID:      12:34:56:...
 Subject Alt Names:     *.google.com, *.appengine.google.com, ...
 OCSP Servers:          http://ocsp.pki.goog/wr2
 CA Issuers:            http://pki.goog/repo/certs/wr2.der
+CRL Distribution:      http://crls.pki.goog/wr2.crl
+Revocation Status:     GOOD
+Revocation Checked:    2026-02-11T12:00:00Z
+  Method:              ocsp
+  Status:              good
+  Responder URL:       http://ocsp.pki.goog/wr2
 
 [INTERMEDIATE]
 Version:               3
@@ -180,9 +234,21 @@ Version:               3
       "subject_alternative_names": ["*.google.com", "..."],
       "ocsp_servers": ["http://ocsp.pki.goog/wr2"],
       "issuing_cert_url": ["http://pki.goog/repo/certs/wr2.der"],
+      "crl_distribution_points": ["http://crls.pki.goog/wr2.crl"],
       "fingerprint": {
         "sha1": "ab:cd:ef:...",
         "sha256": "12:34:56:..."
+      },
+      "revocation": {
+        "overall_status": "good",
+        "checked_at": "2026-02-11T12:00:00Z",
+        "results": [
+          {
+            "method": "ocsp",
+            "status": "good",
+            "responder_url": "http://ocsp.pki.goog/wr2"
+          }
+        ]
       }
     }
   ],
@@ -210,8 +276,17 @@ certificates:
       - TLS Web Server Authentication
     subject_alternative_names:
       - "*.google.com"
+    crl_distribution_points:
+      - "http://crls.pki.goog/wr2.crl"
     fingerprint:
       sha1: "ab:cd:ef:..."
       sha256: "12:34:56:..."
+    revocation:
+      overall_status: good
+      checked_at: "2026-02-11T12:00:00Z"
+      results:
+        - method: ocsp
+          status: good
+          responder_url: "http://ocsp.pki.goog/wr2"
 verified: true
 ```

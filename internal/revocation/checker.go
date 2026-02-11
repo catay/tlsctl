@@ -33,11 +33,15 @@ func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Revoc
 	}
 
 	for _, method := range methods {
-		if method == MethodCRL {
-			results := c.checkCRL(leaf, issuer, opts)
-			for _, r := range results {
-				info.Results = append(info.Results, resultToRevocationResult(r))
-			}
+		var results []Result
+		switch method {
+		case MethodCRL:
+			results = c.checkCRL(leaf, issuer, opts)
+		case MethodOCSP:
+			results = c.checkOCSP(leaf, issuer, opts)
+		}
+		for _, r := range results {
+			info.Results = append(info.Results, resultToRevocationResult(r))
 		}
 	}
 

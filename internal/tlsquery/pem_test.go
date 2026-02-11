@@ -130,13 +130,13 @@ func TestParsePEMVerification(t *testing.T) {
 		}
 	})
 
-	t.Run("leaf type is set", func(t *testing.T) {
+	t.Run("cert type from properties", func(t *testing.T) {
 		chain, err := ParsePEM([]byte(testCertPEM + "\n" + testCACertPEM))
 		if err != nil {
 			t.Fatalf("ParsePEM() unexpected error: %v", err)
 		}
-		if chain.Certificates[0].Type != "leaf" {
-			t.Errorf("expected first cert type=leaf, got %q", chain.Certificates[0].Type)
+		if chain.Certificates[0].Type != "root" {
+			t.Errorf("expected first cert type=root (self-signed CA), got %q", chain.Certificates[0].Type)
 		}
 	})
 }

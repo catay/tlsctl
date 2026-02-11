@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/catay/tlsctl/internal/tlsquery"
 	"github.com/fatih/color"
@@ -70,18 +71,18 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 			fmt.Fprintf(w, "CRL Distribution:      %s\n", strings.Join(cert.CRLDistPoints, ", "))
 		}
 		if cert.Revocation != nil {
-			fmt.Fprintf(w, "Revocation Status:     %s\n", strings.ToUpper(cert.Revocation.OverallStatus))
+			fmt.Fprintf(w, "Revocation Status:     %s\n", strings.ToUpper(string(cert.Revocation.OverallStatus)))
 			if cert.Revocation.CheckedAt != "" {
 				fmt.Fprintf(w, "Revocation Checked:    %s\n", cert.Revocation.CheckedAt)
 			}
 			for _, r := range cert.Revocation.Results {
-				fmt.Fprintf(w, "  Method:              %s\n", r.Method)
-				fmt.Fprintf(w, "  Status:              %s\n", r.Status)
+				fmt.Fprintf(w, "  Method:              %s\n", string(r.Method))
+				fmt.Fprintf(w, "  Status:              %s\n", string(r.Status))
 				if r.ResponderURL != "" {
 					fmt.Fprintf(w, "  Responder URL:       %s\n", r.ResponderURL)
 				}
-				if r.RevokedAt != "" {
-					fmt.Fprintf(w, "  Revoked At:          %s\n", r.RevokedAt)
+				if r.RevokedAt != nil {
+					fmt.Fprintf(w, "  Revoked At:          %s\n", r.RevokedAt.UTC().Format(time.RFC3339))
 				}
 				if r.Reason != "" {
 					fmt.Fprintf(w, "  Reason:              %s\n", r.Reason)

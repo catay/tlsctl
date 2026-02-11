@@ -21,9 +21,9 @@ func NewChecker(client HTTPDoer, now func() time.Time) *Checker {
 	return &Checker{client: client, now: now}
 }
 
-func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *RevocationInfo {
+func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Info {
 	now := c.now()
-	info := &RevocationInfo{
+	info := &Info{
 		CheckedAt: now.UTC().Format(time.RFC3339),
 	}
 
@@ -40,40 +40,24 @@ func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Revoc
 		case MethodOCSP:
 			results = c.checkOCSP(leaf, issuer, opts)
 		}
-		for _, r := range results {
-			info.Results = append(info.Results, resultToRevocationResult(r))
-		}
+		info.Results = append(info.Results, results...)
 	}
 
 	info.OverallStatus = computeOverallStatus(info.Results)
 	return info
 }
 
-func resultToRevocationResult(r Result) RevocationResult {
-	rr := RevocationResult{
-		Method:       string(r.Method),
-		Status:       string(r.Status),
-		ResponderURL: r.ResponderURL,
-		Reason:       r.Reason,
-		Error:        r.Error,
-	}
-	if r.RevokedAt != nil {
-		rr.RevokedAt = r.RevokedAt.UTC().Format(time.RFC3339)
-	}
-	return rr
-}
-
-func computeOverallStatus(results []RevocationResult) string {
+func computeOverallStatus(results []Result) Status {
 	if len(results) == 0 {
-		return string(StatusNotChecked)
+		return StatusNotChecked
 	}
 
 	hasGood := false
 	hasError := false
 	for _, r := range results {
-		switch Status(r.Status) {
+		switch r.Status {
 		case StatusRevoked:
-			return string(StatusRevoked)
+			return StatusRevoked
 		case StatusGood:
 			hasGood = true
 		case StatusError:
@@ -82,10 +66,10 @@ func computeOverallStatus(results []RevocationResult) string {
 	}
 
 	if hasGood {
-		return string(StatusGood)
+		return StatusGood
 	}
 	if hasError {
-		return string(StatusError)
+		return StatusError
 	}
-	return string(StatusUnknown)
+	return StatusUnknown
 }

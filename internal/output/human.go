@@ -75,9 +75,9 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	if leaf.Revocation != nil {
 		method := ""
 		if len(leaf.Revocation.Results) > 0 {
-			method = leaf.Revocation.Results[0].Method
+			method = string(leaf.Revocation.Results[0].Method)
 		}
-		revLabel := formatRevocationLabel(leaf.Revocation.OverallStatus, method)
+		revLabel := formatRevocationLabel(string(leaf.Revocation.OverallStatus), method)
 		fmt.Fprintf(w, "  Revocation: %s\n", revLabel)
 	}
 

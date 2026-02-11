@@ -165,13 +165,13 @@ func TestCheckCRL_NotRevoked(t *testing.T) {
 	checker := NewChecker(srv.Client(), time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
 
-	if info.OverallStatus != string(StatusGood) {
+	if info.OverallStatus != StatusGood {
 		t.Errorf("expected overall status %q, got %q", StatusGood, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusGood) {
+	if info.Results[0].Status != StatusGood {
 		t.Errorf("expected result status %q, got %q", StatusGood, info.Results[0].Status)
 	}
 }
@@ -195,17 +195,17 @@ func TestCheckCRL_Revoked(t *testing.T) {
 	checker := NewChecker(srv.Client(), time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
 
-	if info.OverallStatus != string(StatusRevoked) {
+	if info.OverallStatus != StatusRevoked {
 		t.Errorf("expected overall status %q, got %q", StatusRevoked, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
 	r := info.Results[0]
-	if r.Status != string(StatusRevoked) {
+	if r.Status != StatusRevoked {
 		t.Errorf("expected result status %q, got %q", StatusRevoked, r.Status)
 	}
-	if r.RevokedAt == "" {
+	if r.RevokedAt == nil {
 		t.Error("expected RevokedAt to be set")
 	}
 	if r.Reason != "key compromise" {
@@ -220,13 +220,13 @@ func TestCheckCRL_NoCRLDistributionPoints(t *testing.T) {
 	checker := NewChecker(http.DefaultClient, time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
 
-	if info.OverallStatus != string(StatusUnknown) {
+	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusNotChecked) {
+	if info.Results[0].Status != StatusNotChecked {
 		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
 	}
 }
@@ -242,13 +242,13 @@ func TestCheckCRL_FetchError(t *testing.T) {
 		Timeout:  500 * time.Millisecond,
 	})
 
-	if info.OverallStatus != string(StatusError) {
+	if info.OverallStatus != StatusError {
 		t.Errorf("expected overall status %q, got %q", StatusError, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusError) {
+	if info.Results[0].Status != StatusError {
 		t.Errorf("expected result status %q, got %q", StatusError, info.Results[0].Status)
 	}
 	if info.Results[0].Error == "" {
@@ -278,14 +278,14 @@ func TestCheckCRL_StaleCRL(t *testing.T) {
 		SoftFail: true,
 	})
 
-	if info.OverallStatus != string(StatusUnknown) {
+	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
 	r := info.Results[0]
-	if r.Status != string(StatusUnknown) {
+	if r.Status != StatusUnknown {
 		t.Errorf("expected result status %q, got %q", StatusUnknown, r.Status)
 	}
 	if r.Error != "stale CRL: past NextUpdate time" {
@@ -296,62 +296,62 @@ func TestCheckCRL_StaleCRL(t *testing.T) {
 func TestComputeOverallStatus(t *testing.T) {
 	tests := []struct {
 		name     string
-		results  []RevocationResult
-		expected string
+		results  []Result
+		expected Status
 	}{
 		{
 			name:     "no results",
 			results:  nil,
-			expected: string(StatusNotChecked),
+			expected: StatusNotChecked,
 		},
 		{
 			name:     "single good",
-			results:  []RevocationResult{{Status: string(StatusGood)}},
-			expected: string(StatusGood),
+			results:  []Result{{Status: StatusGood}},
+			expected: StatusGood,
 		},
 		{
 			name:     "single revoked",
-			results:  []RevocationResult{{Status: string(StatusRevoked)}},
-			expected: string(StatusRevoked),
+			results:  []Result{{Status: StatusRevoked}},
+			expected: StatusRevoked,
 		},
 		{
 			name:     "single error",
-			results:  []RevocationResult{{Status: string(StatusError)}},
-			expected: string(StatusError),
+			results:  []Result{{Status: StatusError}},
+			expected: StatusError,
 		},
 		{
 			name:     "single unknown",
-			results:  []RevocationResult{{Status: string(StatusUnknown)}},
-			expected: string(StatusUnknown),
+			results:  []Result{{Status: StatusUnknown}},
+			expected: StatusUnknown,
 		},
 		{
 			name:     "single not_checked",
-			results:  []RevocationResult{{Status: string(StatusNotChecked)}},
-			expected: string(StatusUnknown),
+			results:  []Result{{Status: StatusNotChecked}},
+			expected: StatusUnknown,
 		},
 		{
 			name: "revoked takes precedence over good",
-			results: []RevocationResult{
-				{Status: string(StatusGood)},
-				{Status: string(StatusRevoked)},
+			results: []Result{
+				{Status: StatusGood},
+				{Status: StatusRevoked},
 			},
-			expected: string(StatusRevoked),
+			expected: StatusRevoked,
 		},
 		{
 			name: "good takes precedence over error",
-			results: []RevocationResult{
-				{Status: string(StatusError)},
-				{Status: string(StatusGood)},
+			results: []Result{
+				{Status: StatusError},
+				{Status: StatusGood},
 			},
-			expected: string(StatusGood),
+			expected: StatusGood,
 		},
 		{
 			name: "error takes precedence over unknown",
-			results: []RevocationResult{
-				{Status: string(StatusUnknown)},
-				{Status: string(StatusError)},
+			results: []Result{
+				{Status: StatusUnknown},
+				{Status: StatusError},
 			},
-			expected: string(StatusError),
+			expected: StatusError,
 		},
 	}
 
@@ -382,13 +382,13 @@ func TestCheckOCSP_NotRevoked(t *testing.T) {
 	checker := NewChecker(srv.Client(), time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
 
-	if info.OverallStatus != string(StatusGood) {
+	if info.OverallStatus != StatusGood {
 		t.Errorf("expected overall status %q, got %q", StatusGood, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusGood) {
+	if info.Results[0].Status != StatusGood {
 		t.Errorf("expected result status %q, got %q", StatusGood, info.Results[0].Status)
 	}
 }
@@ -413,17 +413,17 @@ func TestCheckOCSP_Revoked(t *testing.T) {
 	checker := NewChecker(srv.Client(), time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
 
-	if info.OverallStatus != string(StatusRevoked) {
+	if info.OverallStatus != StatusRevoked {
 		t.Errorf("expected overall status %q, got %q", StatusRevoked, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
 	r := info.Results[0]
-	if r.Status != string(StatusRevoked) {
+	if r.Status != StatusRevoked {
 		t.Errorf("expected result status %q, got %q", StatusRevoked, r.Status)
 	}
-	if r.RevokedAt == "" {
+	if r.RevokedAt == nil {
 		t.Error("expected RevokedAt to be set")
 	}
 	if r.Reason != "key compromise" {
@@ -438,13 +438,13 @@ func TestCheckOCSP_NoOCSPServer(t *testing.T) {
 	checker := NewChecker(http.DefaultClient, time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
 
-	if info.OverallStatus != string(StatusUnknown) {
+	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusNotChecked) {
+	if info.Results[0].Status != StatusNotChecked {
 		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
 	}
 }
@@ -456,13 +456,13 @@ func TestCheckOCSP_NoIssuer(t *testing.T) {
 	checker := NewChecker(http.DefaultClient, time.Now)
 	info := checker.CheckCert(leaf, nil, Options{Methods: []Method{MethodOCSP}})
 
-	if info.OverallStatus != string(StatusUnknown) {
+	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusNotChecked) {
+	if info.Results[0].Status != StatusNotChecked {
 		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
 	}
 }
@@ -478,13 +478,13 @@ func TestCheckOCSP_FetchError(t *testing.T) {
 		Timeout:  500 * time.Millisecond,
 	})
 
-	if info.OverallStatus != string(StatusError) {
+	if info.OverallStatus != StatusError {
 		t.Errorf("expected overall status %q, got %q", StatusError, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != string(StatusError) {
+	if info.Results[0].Status != StatusError {
 		t.Errorf("expected result status %q, got %q", StatusError, info.Results[0].Status)
 	}
 	if info.Results[0].Error == "" {
@@ -513,14 +513,14 @@ func TestCheckOCSP_StaleResponse(t *testing.T) {
 		SoftFail: true,
 	})
 
-	if info.OverallStatus != string(StatusUnknown) {
+	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
 	r := info.Results[0]
-	if r.Status != string(StatusUnknown) {
+	if r.Status != StatusUnknown {
 		t.Errorf("expected result status %q, got %q", StatusUnknown, r.Status)
 	}
 	if r.Error != "stale OCSP response: past NextUpdate time" {

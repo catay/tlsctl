@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"crypto/x509"
-	"encoding/pem"
 	"net/http"
 	"os"
 	"time"
@@ -78,14 +77,14 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 		return
 	}
 
-	leaf := parseCertPEM(chain.Certificates[0].PEM)
-	if leaf == nil {
+	leaf, err := tlsquery.ParseCertPEM(chain.Certificates[0].PEM)
+	if err != nil {
 		return
 	}
 
 	var issuer *x509.Certificate
 	if len(chain.Certificates) > 1 {
-		issuer = parseCertPEM(chain.Certificates[1].PEM)
+		issuer, _ = tlsquery.ParseCertPEM(chain.Certificates[1].PEM)
 	}
 
 	var methods []revocation.Method
@@ -107,21 +106,6 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 
 	result := checker.CheckCert(leaf, issuer, opts)
 	chain.Certificates[0].Revocation = result
-}
-
-func parseCertPEM(pemData string) *x509.Certificate {
-	if pemData == "" {
-		return nil
-	}
-	block, _ := pem.Decode([]byte(pemData))
-	if block == nil {
-		return nil
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil
-	}
-	return cert
 }
 
 func init() {

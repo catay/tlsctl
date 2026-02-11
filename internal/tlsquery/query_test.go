@@ -66,14 +66,13 @@ func TestQuery_ConnectionRefused(t *testing.T) {
 func TestCertType(t *testing.T) {
 	tests := []struct {
 		name     string
-		index    int
 		isCA     bool
 		selfSign bool
 		want     string
 	}{
-		{"leaf certificate", 0, false, false, "leaf"},
-		{"intermediate CA", 1, true, false, "intermediate"},
-		{"root CA", 1, true, true, "root"},
+		{"leaf certificate", false, false, "leaf"},
+		{"intermediate CA", true, false, "intermediate"},
+		{"root CA", true, true, "root"},
 	}
 
 	for _, tt := range tests {
@@ -90,9 +89,9 @@ func TestCertType(t *testing.T) {
 				cert.Issuer = pkix.Name{CommonName: "Other"}
 			}
 
-			got := certType(tt.index, cert)
+			got := CertTypeFromCert(cert)
 			if got != tt.want {
-				t.Errorf("certType() = %q, want %q", got, tt.want)
+				t.Errorf("CertTypeFromCert() = %q, want %q", got, tt.want)
 			}
 		})
 	}

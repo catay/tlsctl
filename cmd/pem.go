@@ -20,6 +20,10 @@ func newPemCmd() *cobra.Command {
 		Long:  `Reads a PEM file and displays certificate metadata for all certificates found.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateRevocationMode(rf.mode); err != nil {
+				return err
+			}
+
 			opts := tlsquery.PEMOptions{CACertFile: caCertFile}
 			chainInfo, err := tlsquery.ParsePEMFile(args[0], opts)
 			if err != nil {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -19,10 +20,23 @@ type revocationFlags struct {
 	softFail bool
 }
 
+var validRevocationModes = map[string]bool{
+	"off":  true,
+	"crl":  true,
+	"ocsp": true,
+}
+
 func addRevocationFlags(cmd *cobra.Command, rf *revocationFlags) {
 	cmd.Flags().StringVar(&rf.mode, "revocation", "off", "Revocation check mode: off, crl, ocsp")
 	cmd.Flags().DurationVar(&rf.timeout, "revocation-timeout", 5*time.Second, "Timeout for revocation checks")
 	cmd.Flags().BoolVar(&rf.softFail, "revocation-soft-fail", true, "Treat revocation check errors as unknown (soft-fail)")
+}
+
+func validateRevocationMode(mode string) error {
+	if !validRevocationModes[mode] {
+		return fmt.Errorf("invalid revocation mode %q: must be one of off, crl, ocsp", mode)
+	}
+	return nil
 }
 
 func newClientCmd() *cobra.Command {
@@ -37,6 +51,10 @@ func newClientCmd() *cobra.Command {
 		Long:  `Connects to a TLS endpoint and displays certificate metadata.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateRevocationMode(rf.mode); err != nil {
+				return err
+			}
+
 			endpoint, err := cli.NormalizeEndpoint(args[0])
 			if err != nil {
 				return err
@@ -93,8 +111,6 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 		methods = []revocation.Method{revocation.MethodCRL}
 	case "ocsp":
 		methods = []revocation.Method{revocation.MethodOCSP}
-	default:
-		methods = []revocation.Method{revocation.MethodCRL}
 	}
 
 	checker := revocation.NewChecker(&http.Client{Timeout: timeout}, nil)

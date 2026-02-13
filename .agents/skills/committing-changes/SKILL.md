@@ -1,6 +1,6 @@
 ---
 name: committing-changes
-description: "Automates the full commit-to-merge workflow: creates a branch, commits, pushes, opens a PR, waits for CI, squash merges, and deletes the branch. Triggers on: commit, ship it, land changes."
+description: "Automates the full commit-to-merge workflow: creates a branch, commits, pushes, opens a PR, waits for CI, squash merges, and deletes the branch. Also handles creating new releases. Triggers on: commit, ship it, land changes, release, new release, cut a release."
 ---
 
 # Committing Changes

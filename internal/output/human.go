@@ -81,6 +81,10 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 		fmt.Fprintf(w, "  Revocation: %s\n", revLabel)
 	}
 
+	if len(chain.TLSVersions) > 0 {
+		fmt.Fprintf(w, "  TLS:      %s\n", strings.Join(chain.TLSVersions, ", "))
+	}
+
 	if len(chain.Certificates) > 1 {
 		fmt.Fprintln(w)
 		chainNames := chain.ChainNames()

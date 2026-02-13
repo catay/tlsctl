@@ -30,7 +30,13 @@ Follow these steps in order. Stop and report errors at any step.
 - Generate a commit message following Conventional Commits: `feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`, `test: ...`
 - Present the branch name and commit message to the user and ask for confirmation before proceeding
 
-### 3. Create Branch and Commit
+### 3. Update Documentation
+
+- Review the changes being committed and determine if they affect user-facing behavior (new flags, changed output, new subcommands, etc.)
+- If so, update `README.md` (and any other relevant docs) to reflect the changes
+- If the changes are purely internal (refactors, test additions, CI changes), skip this step
+
+### 4. Create Branch and Commit
 
 ```bash
 git checkout -b <branch-name>
@@ -39,7 +45,7 @@ git commit -m "<commit-message>"
 git push -u origin <branch-name>
 ```
 
-### 4. Create Pull Request
+### 5. Create Pull Request
 
 ```bash
 gh pr create --title "<commit-message>" --body "<pr-description>" --base main
@@ -47,7 +53,7 @@ gh pr create --title "<commit-message>" --body "<pr-description>" --base main
 
 - The PR body should summarize the changes concisely
 
-### 5. Wait for CI
+### 6. Wait for CI
 
 Before waiting, check the CI workflow path filters in `.github/workflows/ci.yaml`. If none of the changed files match the paths listed in the `on.pull_request.paths` filter, skip waiting and proceed directly to merge.
 
@@ -56,13 +62,13 @@ Otherwise, run `scripts/wait-for-ci.sh` to poll the CI status of the PR. The scr
 - If CI passes, proceed to merge
 - If CI fails, stop and report the failure to the user. Do NOT merge.
 
-### 6. Squash Merge
+### 7. Squash Merge
 
 ```bash
 gh pr merge --squash --delete-branch
 ```
 
-### 7. Clean Up
+### 8. Clean Up
 
 ```bash
 git checkout main

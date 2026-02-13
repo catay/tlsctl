@@ -21,6 +21,10 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 		}
 		fmt.Fprintf(w, "%s Certificate verification failed: %s\n\n", color.YellowString("⚠"), reason)
 	}
+	if len(chain.TLSVersions) > 0 {
+		fmt.Fprintf(w, "TLS Versions:          %s\n\n", strings.Join(chain.TLSVersions, ", "))
+	}
+
 	for i, cert := range chain.Certificates {
 		if i > 0 {
 			fmt.Fprintln(w)

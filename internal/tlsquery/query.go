@@ -47,11 +47,13 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		chain := buildChain(certs)
 		chain.Verified = false
 		chain.VerificationError = abbreviateVerifyError(cve.Err)
+		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
 		return chain, nil
 	}
 
 	chain := buildChain(certs)
 	chain.Verified = true
+	chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
 	return chain, nil
 }
 

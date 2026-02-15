@@ -1,10 +1,18 @@
-# tlsctl
 
 [![CI](https://github.com/catay/tlsctl/actions/workflows/ci.yaml/badge.svg)](https://github.com/catay/tlsctl/actions/workflows/ci.yaml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/catay/tlsctl)](https://github.com/catay/tlsctl/blob/main/go.mod)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catay/tlsctl)](https://goreportcard.com/report/github.com/catay/tlsctl)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/catay/tlsctl/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/catay/tlsctl)](https://github.com/catay/tlsctl/releases/latest)
+
+<h1>
+<p align="center">
+  <img src="images/tlsctl-192x192.png" alt="tlsctl logo" width="192" height="192">
+  <br>tlsctl
+</p>
+</h1>
+
+## About
 
 **tlsctl** is a fast, zero-config command-line tool for inspecting TLS certificates from remote endpoints or local PEM files. Get instant visibility into certificate chains, expiry status, revocation state, and more — all from your terminal.
 

@@ -88,12 +88,25 @@ docker run --rm -v /path/to/cert.pem:/cert.pem:ro tlsctl pem /cert.pem
 # Inspect any TLS endpoint (port 443 is the default)
 tlsctl client example.com
 
+# Inspect multiple endpoints from a file (one per line)
+tlsctl client --file hosts.txt
+
+# Disable TLS version probing (faster for large lists)
+tlsctl client --no-tls-probe example.com
+
 # Use a custom port
 tlsctl client example.com:8443
 
 # Inspect a local PEM file
 tlsctl pem cert.pem
 ```
+
+## Exit codes
+
+- `0` ok
+- `1` runtime error (e.g., connection or parsing failure)
+- `2` insecure or invalid (unverified, expired, or revoked)
+- `3` revocation error (revocation check failed)
 
 ## Usage examples
 

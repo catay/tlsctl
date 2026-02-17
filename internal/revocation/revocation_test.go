@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,10 +79,18 @@ func newLeaf(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, crlDPs
 func serveCRL(t *testing.T, crlBytes []byte) *httptest.Server {
 	t.Helper()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skipping CRL test: failed to listen on localhost: %v", err)
+		return nil
+	}
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/pkix-crl")
 		_, _ = w.Write(crlBytes)
 	}))
+	srv.Listener = listener
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -147,10 +156,18 @@ func createOCSPResponse(t *testing.T, leaf, issuer *x509.Certificate, issuerKey 
 func serveOCSP(t *testing.T, respBytes []byte) *httptest.Server {
 	t.Helper()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skipping OCSP test: failed to listen on localhost: %v", err)
+		return nil
+	}
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/ocsp-response")
 		_, _ = w.Write(respBytes)
 	}))
+	srv.Listener = listener
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return srv
 }

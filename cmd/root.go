@@ -12,8 +12,13 @@ var rootCmd = &cobra.Command{
 	Long:  `tlsctl provides commands for querying and inspecting TLS certificates.`,
 }
 
+var exitCode int
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+	if exitCode != 0 {
+		os.Exit(exitCode)
 	}
 }

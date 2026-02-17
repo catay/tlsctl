@@ -34,15 +34,13 @@ func newPemCmd() *cobra.Command {
 				runRevocationCheck(chainInfo, rf.mode, rf.timeout, rf.softFail)
 			}
 
-			renderer, err := output.New(output.Format(outputFormat))
-			if err != nil {
-				return err
-			}
+			now := time.Now().UTC()
+			updateExitCodeForChain(chainInfo, now)
 
 			renderOpts := output.Options{
-				Now: time.Now,
+				Now: func() time.Time { return now },
 			}
-			return renderer.Render(os.Stdout, chainInfo, renderOpts)
+			return renderChains(os.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
 		},
 	}
 

@@ -20,6 +20,8 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		return nil, err
 	}
 
+	probeVersions := len(opts) == 0 || !opts[0].DisableTLSProbe
+
 	host, _, _ := net.SplitHostPort(endpoint)
 	if config.ServerName == "" && host != "" {
 		config.ServerName = host
@@ -47,13 +49,17 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 		chain := buildChain(certs)
 		chain.Verified = false
 		chain.VerificationError = abbreviateVerifyError(cve.Err)
-		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+		if probeVersions {
+			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+		}
 		return chain, nil
 	}
 
 	chain := buildChain(certs)
 	chain.Verified = true
-	chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+	if probeVersions {
+		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+	}
 	return chain, nil
 }
 

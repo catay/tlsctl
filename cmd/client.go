@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"bufio"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/catay/tlsctl/internal/cli"
@@ -12,6 +16,7 @@ import (
 	"github.com/catay/tlsctl/internal/revocation"
 	"github.com/catay/tlsctl/internal/tlsquery"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 type revocationFlags struct {
@@ -43,48 +48,80 @@ func newClientCmd() *cobra.Command {
 	var outputFormat string
 	var caCertFile string
 	var proxyURL string
+	var inputFile string
+	var noTLSProbe bool
 	var rf revocationFlags
 
 	cmd := &cobra.Command{
-		Use:   "client FQDN[:PORT]",
+		Use:   "client FQDN[:PORT] [FQDN[:PORT]...]",
 		Short: "Query TLS certificate information for a given endpoint",
 		Long:  `Connects to a TLS endpoint and displays certificate metadata.`,
-		Args:  cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return nil
+			}
+			if inputFile != "" {
+				return nil
+			}
+			return fmt.Errorf("must provide at least one endpoint or --file")
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateRevocationMode(rf.mode); err != nil {
 				return err
 			}
 
-			endpoint, err := cli.NormalizeEndpoint(args[0])
+			targets, err := collectTargets(args, inputFile)
 			if err != nil {
 				return err
 			}
 
-			opts := tlsquery.QueryOptions{CACertFile: caCertFile, Proxy: proxyURL}
-			certInfo, err := tlsquery.Query(endpoint, opts)
-			if err != nil {
-				return err
+			opts := tlsquery.QueryOptions{
+				CACertFile:      caCertFile,
+				Proxy:           proxyURL,
+				DisableTLSProbe: noTLSProbe,
 			}
 
-			if rf.mode != "off" && rf.mode != "" {
-				runRevocationCheck(certInfo, rf.mode, rf.timeout, rf.softFail)
-			}
-
-			renderer, err := output.New(output.Format(outputFormat))
-			if err != nil {
-				return err
-			}
-
+			now := time.Now().UTC()
 			renderOpts := output.Options{
-				Now: time.Now,
+				Now: func() time.Time { return now },
 			}
-			return renderer.Render(os.Stdout, certInfo, renderOpts)
+
+			var chains []*tlsquery.ChainInfo
+			var runtimeErrors []error
+			for _, endpoint := range targets {
+				certInfo, err := tlsquery.Query(endpoint, opts)
+				if err != nil {
+					runtimeErrors = append(runtimeErrors, fmt.Errorf("%s: %w", endpoint, err))
+					continue
+				}
+
+				if rf.mode != "off" && rf.mode != "" {
+					runRevocationCheck(certInfo, rf.mode, rf.timeout, rf.softFail)
+				}
+
+				updateExitCodeForChain(certInfo, now)
+				chains = append(chains, certInfo)
+			}
+
+			if err := renderChains(os.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
+				return err
+			}
+
+			if len(runtimeErrors) > 0 {
+				for _, err := range runtimeErrors {
+					fmt.Fprintln(os.Stderr, err)
+				}
+				setExitCode(ExitRuntimeError)
+			}
+			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
+	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
+	cmd.Flags().BoolVar(&noTLSProbe, "no-tls-probe", false, "Disable TLS version probing")
 	addRevocationFlags(cmd, &rf)
 
 	return cmd
@@ -122,6 +159,112 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 
 	result := checker.CheckCert(leaf, issuer, opts)
 	chain.Certificates[0].Revocation = result
+}
+
+func collectTargets(args []string, inputFile string) ([]string, error) {
+	var targets []string
+	if inputFile != "" {
+		fileTargets, err := readTargetsFromFile(inputFile)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, fileTargets...)
+	}
+
+	targets = append(targets, args...)
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("no endpoints provided")
+	}
+
+	normalized := make([]string, 0, len(targets))
+	for _, raw := range targets {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			continue
+		}
+		endpoint, err := cli.NormalizeEndpoint(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid endpoint %q: %w", value, err)
+		}
+		normalized = append(normalized, endpoint)
+	}
+
+	if len(normalized) == 0 {
+		return nil, fmt.Errorf("no valid endpoints found")
+	}
+
+	return normalized, nil
+}
+
+func readTargetsFromFile(path string) ([]string, error) {
+	var r io.Reader
+	if path == "-" {
+		r = os.Stdin
+	} else {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read endpoints file: %w", err)
+		}
+		defer file.Close()
+		r = file
+	}
+
+	var targets []string
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if idx := strings.Index(line, "#"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+			if line == "" {
+				continue
+			}
+		}
+		targets = append(targets, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read endpoints file: %w", err)
+	}
+	return targets, nil
+}
+
+func renderChains(w io.Writer, format output.Format, chains []*tlsquery.ChainInfo, opts output.Options) error {
+	if len(chains) == 0 {
+		return nil
+	}
+
+	if len(chains) > 1 && (format == output.FormatJSON || format == output.FormatYAML) {
+		clean := make([]tlsquery.ChainInfo, len(chains))
+		for i, chain := range chains {
+			clean[i] = *chain.WithoutPEM()
+		}
+		switch format {
+		case output.FormatJSON:
+			encoder := json.NewEncoder(w)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(clean)
+		case output.FormatYAML:
+			encoder := yaml.NewEncoder(w)
+			encoder.SetIndent(2)
+			return encoder.Encode(clean)
+		}
+	}
+
+	renderer, err := output.New(format)
+	if err != nil {
+		return err
+	}
+	for i, chain := range chains {
+		if i > 0 && format != output.FormatRaw {
+			fmt.Fprintln(w)
+		}
+		if err := renderer.Render(w, chain, opts); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {

@@ -54,6 +54,7 @@ type ChainInfo struct {
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	CACertFile string // Path to custom CA certificate file (PEM format)
-	Proxy      string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
+	CACertFile      string // Path to custom CA certificate file (PEM format)
+	Proxy           string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
+	DisableTLSProbe bool   // Skip probing supported TLS versions.
 }

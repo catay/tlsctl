@@ -94,7 +94,7 @@ func TestParsePEM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, err := ParsePEM([]byte(tt.data))
+			chain, err := ParsePEM([]byte(tt.data), PEMOptions{})
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("ParsePEM() expected error, got nil")
@@ -118,7 +118,7 @@ func TestParsePEM(t *testing.T) {
 
 func TestParsePEMVerification(t *testing.T) {
 	t.Run("self-signed cert is unverified", func(t *testing.T) {
-		chain, err := ParsePEM([]byte(testCertPEM))
+		chain, err := ParsePEM([]byte(testCertPEM), PEMOptions{})
 		if err != nil {
 			t.Fatalf("ParsePEM() unexpected error: %v", err)
 		}
@@ -131,7 +131,7 @@ func TestParsePEMVerification(t *testing.T) {
 	})
 
 	t.Run("cert type from properties", func(t *testing.T) {
-		chain, err := ParsePEM([]byte(testCertPEM + "\n" + testCACertPEM))
+		chain, err := ParsePEM([]byte(testCertPEM+"\n"+testCACertPEM), PEMOptions{})
 		if err != nil {
 			t.Fatalf("ParsePEM() unexpected error: %v", err)
 		}
@@ -150,7 +150,7 @@ func TestParsePEMFile(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		chain, err := ParsePEMFile(path)
+		chain, err := ParsePEMFile(path, PEMOptions{})
 		if err != nil {
 			t.Errorf("ParsePEMFile() unexpected error: %v", err)
 			return
@@ -170,7 +170,7 @@ func TestParsePEMFile(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		chain, err := ParsePEMFile(path)
+		chain, err := ParsePEMFile(path, PEMOptions{})
 		if err != nil {
 			t.Errorf("ParsePEMFile() unexpected error: %v", err)
 			return
@@ -181,7 +181,7 @@ func TestParsePEMFile(t *testing.T) {
 	})
 
 	t.Run("non-existent file", func(t *testing.T) {
-		_, err := ParsePEMFile(filepath.Join(tmpDir, "nonexistent.pem"))
+		_, err := ParsePEMFile(filepath.Join(tmpDir, "nonexistent.pem"), PEMOptions{})
 		if err == nil {
 			t.Error("ParsePEMFile() expected error for non-existent file, got nil")
 		}

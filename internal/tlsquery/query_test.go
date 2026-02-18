@@ -28,7 +28,7 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 	TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	defer func() { TLSConfig = oldConfig }()
 
-	chain, err := Query(addr)
+	chain, err := Query(addr, QueryOptions{})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
@@ -50,14 +50,14 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 }
 
 func TestQuery_InvalidEndpoint(t *testing.T) {
-	_, err := Query("invalid:99999")
+	_, err := Query("invalid:99999", QueryOptions{})
 	if err == nil {
 		t.Error("expected error for invalid endpoint")
 	}
 }
 
 func TestQuery_ConnectionRefused(t *testing.T) {
-	_, err := Query("127.0.0.1:1")
+	_, err := Query("127.0.0.1:1", QueryOptions{})
 	if err == nil {
 		t.Error("expected error for connection refused")
 	}
@@ -175,7 +175,7 @@ func TestResolveProxy(t *testing.T) {
 			t.Setenv("HTTP_PROXY", "")
 			t.Setenv("HTTPS_PROXY", "")
 
-			opts := []QueryOptions{{Proxy: tt.proxy}}
+			opts := QueryOptions{Proxy: tt.proxy}
 			u, err := resolveProxy("example.com:443", opts)
 			if err != nil {
 				t.Fatalf("resolveProxy() error: %v", err)
@@ -199,7 +199,7 @@ func TestResolveProxy(t *testing.T) {
 func TestResolveProxy_EnvFallback(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", "http://envproxy:9090")
 
-	u, err := resolveProxy("example.com:443", nil)
+	u, err := resolveProxy("example.com:443", QueryOptions{})
 	if err != nil {
 		t.Fatalf("resolveProxy() error: %v", err)
 	}

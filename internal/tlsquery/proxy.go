@@ -21,11 +21,8 @@ func (b *bufferedConn) Read(p []byte) (int, error) {
 	return b.r.Read(p)
 }
 
-func resolveProxy(endpoint string, opts []QueryOptions) (*url.URL, error) {
-	var proxyStr string
-	if len(opts) > 0 {
-		proxyStr = opts[0].Proxy
-	}
+func resolveProxy(endpoint string, opts QueryOptions) (*url.URL, error) {
+	proxyStr := opts.Proxy
 
 	if proxyStr != "" {
 		if !strings.Contains(proxyStr, "://") {

@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +15,6 @@ import (
 	"github.com/catay/tlsctl/internal/revocation"
 	"github.com/catay/tlsctl/internal/tlsquery"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 type revocationFlags struct {
@@ -235,27 +233,17 @@ func renderChains(w io.Writer, format output.Format, chains []*tlsquery.ChainInf
 		return nil
 	}
 
-	if len(chains) > 1 && (format == output.FormatJSON || format == output.FormatYAML) {
-		clean := make([]tlsquery.ChainInfo, len(chains))
-		for i, chain := range chains {
-			clean[i] = *chain.WithoutPEM()
-		}
-		switch format {
-		case output.FormatJSON:
-			encoder := json.NewEncoder(w)
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(clean)
-		case output.FormatYAML:
-			encoder := yaml.NewEncoder(w)
-			encoder.SetIndent(2)
-			return encoder.Encode(clean)
-		}
-	}
-
 	renderer, err := output.New(format)
 	if err != nil {
 		return err
 	}
+
+	if len(chains) > 1 {
+		if mr, ok := renderer.(output.MultiRenderer); ok {
+			return mr.RenderAll(w, chains, opts)
+		}
+	}
+
 	for i, chain := range chains {
 		if i > 0 && format != output.FormatRaw {
 			fmt.Fprintln(w)

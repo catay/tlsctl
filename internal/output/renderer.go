@@ -11,6 +11,10 @@ type Renderer interface {
 	Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error
 }
 
+type MultiRenderer interface {
+	RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error
+}
+
 type Options struct {
 	Now func() time.Time
 }

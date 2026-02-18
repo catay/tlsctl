@@ -13,17 +13,17 @@ type PEMOptions struct {
 }
 
 // ParsePEMFile reads a PEM file and returns certificate information for all certificates found.
-func ParsePEMFile(path string, opts ...PEMOptions) (*ChainInfo, error) {
+func ParsePEMFile(path string, opts PEMOptions) (*ChainInfo, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return ParsePEM(data, opts...)
+	return ParsePEM(data, opts)
 }
 
 // ParsePEM parses PEM-encoded certificate data and returns certificate information.
-func ParsePEM(data []byte, opts ...PEMOptions) (*ChainInfo, error) {
+func ParsePEM(data []byte, opts PEMOptions) (*ChainInfo, error) {
 	var certs []*x509.Certificate
 
 	for {
@@ -49,11 +49,7 @@ func ParsePEM(data []byte, opts ...PEMOptions) (*ChainInfo, error) {
 
 	chain := buildChain(certs)
 
-	var o PEMOptions
-	if len(opts) > 0 {
-		o = opts[0]
-	}
-	verifyPEMChain(chain, certs, o)
+	verifyPEMChain(chain, certs, opts)
 
 	return chain, nil
 }

@@ -14,13 +14,13 @@ import (
 var TLSConfig *tls.Config
 
 // Query connects to the given endpoint and retrieves certificate chain information.
-func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
+func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	config, err := buildConfig(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	probeVersions := len(opts) == 0 || !opts[0].DisableTLSProbe
+	probeVersions := !opts.DisableTLSProbe
 
 	host, _, _ := net.SplitHostPort(endpoint)
 	if config.ServerName == "" && host != "" {
@@ -63,7 +63,7 @@ func Query(endpoint string, opts ...QueryOptions) (*ChainInfo, error) {
 	return chain, nil
 }
 
-func buildConfig(opts []QueryOptions) (*tls.Config, error) {
+func buildConfig(opts QueryOptions) (*tls.Config, error) {
 	config := TLSConfig
 	if config == nil {
 		config = &tls.Config{}
@@ -71,8 +71,8 @@ func buildConfig(opts []QueryOptions) (*tls.Config, error) {
 		config = config.Clone()
 	}
 
-	if len(opts) > 0 && opts[0].CACertFile != "" {
-		caCert, err := os.ReadFile(opts[0].CACertFile)
+	if opts.CACertFile != "" {
+		caCert, err := os.ReadFile(opts.CACertFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 		}

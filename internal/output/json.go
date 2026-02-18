@@ -15,3 +15,13 @@ func (JSONRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(outputData)
 }
+
+func (JSONRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
+	clean := make([]tlsquery.ChainInfo, len(chains))
+	for i, chain := range chains {
+		clean[i] = *chain.WithoutPEM()
+	}
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(clean)
+}

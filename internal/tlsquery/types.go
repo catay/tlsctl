@@ -57,4 +57,5 @@ type QueryOptions struct {
 	CACertFile      string // Path to custom CA certificate file (PEM format)
 	Proxy           string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
 	DisableTLSProbe bool   // Skip probing supported TLS versions.
+	ServerName      string // SNI override for TLS handshake (useful when connecting by IP).
 }

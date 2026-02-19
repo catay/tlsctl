@@ -392,6 +392,15 @@ The default output uses color-coded status indicators:
 | `⚠` **secure** | Yellow | Certificate is verified but expires within 30 days |
 | `✗` **insecure** | Red | Certificate verification failed (with reason) |
 
+## Disabling color
+
+Use `--no-color` to strip ANSI color codes from output, useful for piping to other tools or log ingestion:
+
+```bash
+tlsctl client --no-color example.com
+tlsctl client --no-color example.com | tee cert.log
+```
+
 ## Revocation checking
 
 Both `client` and `pem` subcommands support certificate revocation checking via the `--revocation` flag.

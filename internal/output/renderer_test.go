@@ -159,6 +159,44 @@ func TestHumanRenderer(t *testing.T) {
 	}
 }
 
+func TestHumanRendererExpired(t *testing.T) {
+	chain := testChain()
+	chain.Verified = true
+	chain.Certificates[0].NotAfter = "2025-12-01T00:00:00Z"
+	var buf bytes.Buffer
+	r := HumanRenderer{}
+
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "expired 66 days ago") {
+		t.Errorf("expected 'expired 66 days ago' in output, got: %s", output)
+	}
+}
+
+func TestFormatExpiryMsg(t *testing.T) {
+	tests := []struct {
+		days    int
+		expired bool
+		want    string
+	}{
+		{90, false, "expires in 90 days"},
+		{1, false, "expires in 1 day"},
+		{0, false, "expires in 0 days"},
+		{-1, true, "expired 1 day ago"},
+		{-30, true, "expired 30 days ago"},
+	}
+	for _, tt := range tests {
+		got := formatExpiryMsg(tt.days, tt.expired)
+		if got != tt.want {
+			t.Errorf("formatExpiryMsg(%d, %v) = %q, want %q", tt.days, tt.expired, got, tt.want)
+		}
+	}
+}
+
 func TestHumanRendererInsecure(t *testing.T) {
 	chain := testChain()
 	chain.Verified = false

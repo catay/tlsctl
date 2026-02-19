@@ -31,6 +31,9 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 
 	bold := color.New(color.Bold)
 	var status, statusMsg string
+
+	expiryMsg := formatExpiryMsg(daysUntilExpiry, now.After(notAfter))
+
 	switch {
 	case !chain.Verified:
 		status = bold.Add(color.FgRed).Sprint("✗")
@@ -39,10 +42,10 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 			reason = "unverified"
 		}
 		label := color.New(color.Bold, color.FgRed).Sprint("insecure")
-		statusMsg = fmt.Sprintf("%s, %s, expires in %d days", label, reason, daysUntilExpiry)
+		statusMsg = fmt.Sprintf("%s, %s, %s", label, reason, expiryMsg)
 	case now.After(notAfter):
 		status = bold.Add(color.FgRed).Sprint("✗")
-		statusMsg = "expired"
+		statusMsg = expiryMsg
 	case daysUntilExpiry <= 30:
 		status = bold.Add(color.FgYellow).Sprint("⚠")
 		label := color.New(color.Bold, color.FgYellow).Sprint("secure")
@@ -93,6 +96,20 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	}
 
 	return nil
+}
+
+func formatExpiryMsg(days int, expired bool) string {
+	if expired {
+		daysAgo := -days
+		if daysAgo == 1 {
+			return "expired 1 day ago"
+		}
+		return fmt.Sprintf("expired %d days ago", daysAgo)
+	}
+	if days == 1 {
+		return "expires in 1 day"
+	}
+	return fmt.Sprintf("expires in %d days", days)
 }
 
 func formatRevocationLabel(status, method string) string {

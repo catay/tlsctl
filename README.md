@@ -34,6 +34,7 @@ github.com (secure, expires in 52 days) ✓
 - **Revocation checking** — Built-in CRL and OCSP support to detect revoked certificates
 - **PEM file parsing** — Inspect local certificate files with the same rich output
 - **Custom CA support** — Validate against private CAs with `--cacert`
+- **SNI override** — Set a custom server name with `--servername` for IP-based targets with virtual hosts
 - **Proxy aware** — Connect through HTTP proxies with `--proxy` or environment variables
 - **Cross-platform** — Pre-built binaries for Linux, macOS, and Windows (amd64 & arm64)
 - **Lightweight** — Single static binary, no runtime dependencies
@@ -349,6 +350,14 @@ tlsctl client -x http://proxy:3128 example.com
 ```
 
 The `--proxy` flag falls back to `HTTPS_PROXY` / `HTTP_PROXY` environment variables if not set.
+
+### SNI override
+
+Use `--servername` to override the TLS Server Name Indication (SNI) value. This is useful when connecting to an IP address that hosts multiple virtual hosts:
+
+```bash
+tlsctl client --servername example.com 93.184.216.34:443
+```
 
 ### Parsing PEM files
 

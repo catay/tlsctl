@@ -48,6 +48,7 @@ func newClientCmd() *cobra.Command {
 	var proxyURL string
 	var inputFile string
 	var noTLSProbe bool
+	var serverName string
 	var rf revocationFlags
 
 	cmd := &cobra.Command{
@@ -77,6 +78,7 @@ func newClientCmd() *cobra.Command {
 				CACertFile:      caCertFile,
 				Proxy:           proxyURL,
 				DisableTLSProbe: noTLSProbe,
+				ServerName:      serverName,
 			}
 
 			now := time.Now().UTC()
@@ -120,6 +122,7 @@ func newClientCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
 	cmd.Flags().BoolVar(&noTLSProbe, "no-tls-probe", false, "Disable TLS version probing")
+	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
 	addRevocationFlags(cmd, &rf)
 
 	return cmd

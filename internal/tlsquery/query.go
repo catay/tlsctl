@@ -71,6 +71,10 @@ func buildConfig(opts QueryOptions) (*tls.Config, error) {
 		config = config.Clone()
 	}
 
+	if opts.ServerName != "" {
+		config.ServerName = opts.ServerName
+	}
+
 	if opts.CACertFile != "" {
 		caCert, err := os.ReadFile(opts.CACertFile)
 		if err != nil {

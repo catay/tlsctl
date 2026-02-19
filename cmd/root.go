@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,16 @@ var rootCmd = &cobra.Command{
 }
 
 var exitCode int
+var noColor bool
+
+func init() {
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if noColor {
+			color.NoColor = true
+		}
+	}
+}
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {

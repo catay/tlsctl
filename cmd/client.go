@@ -49,6 +49,7 @@ func newClientCmd() *cobra.Command {
 	var inputFile string
 	var noTLSProbe bool
 	var serverName string
+	var startTLS string
 	var rf revocationFlags
 
 	cmd := &cobra.Command{
@@ -69,7 +70,11 @@ func newClientCmd() *cobra.Command {
 				return err
 			}
 
-			targets, err := collectTargets(args, inputFile)
+			if startTLS != "" && !tlsquery.ValidStartTLSProtocol(startTLS) {
+				return fmt.Errorf("invalid --starttls protocol %q: must be one of smtp, imap, pop3, ldap", startTLS)
+			}
+
+			targets, err := collectTargets(args, inputFile, startTLS)
 			if err != nil {
 				return err
 			}
@@ -79,6 +84,7 @@ func newClientCmd() *cobra.Command {
 				Proxy:           proxyURL,
 				DisableTLSProbe: noTLSProbe,
 				ServerName:      serverName,
+				StartTLS:        startTLS,
 			}
 
 			now := time.Now().UTC()
@@ -123,6 +129,7 @@ func newClientCmd() *cobra.Command {
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
 	cmd.Flags().BoolVar(&noTLSProbe, "no-tls-probe", false, "Disable TLS version probing")
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
+	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: smtp, imap, pop3, ldap")
 	addRevocationFlags(cmd, &rf)
 
 	return cmd
@@ -162,7 +169,7 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 	chain.Certificates[0].Revocation = result
 }
 
-func collectTargets(args []string, inputFile string) ([]string, error) {
+func collectTargets(args []string, inputFile string, startTLSProto ...string) ([]string, error) {
 	var targets []string
 	if inputFile != "" {
 		fileTargets, err := readTargetsFromFile(inputFile)
@@ -177,13 +184,18 @@ func collectTargets(args []string, inputFile string) ([]string, error) {
 		return nil, fmt.Errorf("no endpoints provided")
 	}
 
+	proto := ""
+	if len(startTLSProto) > 0 {
+		proto = startTLSProto[0]
+	}
+
 	normalized := make([]string, 0, len(targets))
 	for _, raw := range targets {
 		value := strings.TrimSpace(raw)
 		if value == "" {
 			continue
 		}
-		endpoint, err := cli.NormalizeEndpoint(value)
+		endpoint, err := cli.NormalizeEndpoint(value, proto)
 		if err != nil {
 			return nil, fmt.Errorf("invalid endpoint %q: %w", value, err)
 		}

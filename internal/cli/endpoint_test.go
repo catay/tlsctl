@@ -106,3 +106,30 @@ func TestNormalizeEndpoint(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeEndpoint_StartTLS(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		proto    string
+		want     string
+	}{
+		{"smtp default port", "mail.example.com", "smtp", "mail.example.com:587"},
+		{"imap default port", "mail.example.com", "imap", "mail.example.com:143"},
+		{"pop3 default port", "mail.example.com", "pop3", "mail.example.com:110"},
+		{"ldap default port", "ldap.example.com", "ldap", "ldap.example.com:389"},
+		{"explicit port overrides", "mail.example.com:25", "smtp", "mail.example.com:25"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NormalizeEndpoint(tt.endpoint, tt.proto)
+			if err != nil {
+				t.Fatalf("NormalizeEndpoint(%q, %q) unexpected error: %v", tt.endpoint, tt.proto, err)
+			}
+			if got != tt.want {
+				t.Errorf("NormalizeEndpoint(%q, %q) = %q, want %q", tt.endpoint, tt.proto, got, tt.want)
+			}
+		})
+	}
+}

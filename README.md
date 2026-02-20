@@ -34,6 +34,7 @@ github.com (secure, expires in 52 days) ✓
 - **Revocation checking** — Built-in CRL and OCSP support to detect revoked certificates
 - **PEM file parsing** — Inspect local certificate files with the same rich output
 - **Custom CA support** — Validate against private CAs with `--cacert`
+- **STARTTLS** — Upgrade plaintext connections for SMTP, IMAP, POP3, and LDAP with `--starttls`
 - **SNI override** — Set a custom server name with `--servername` for IP-based targets with virtual hosts
 - **Proxy aware** — Connect through HTTP proxies with `--proxy` or environment variables
 - **Cross-platform** — Pre-built binaries for Linux, macOS, and Windows (amd64 & arm64)
@@ -357,6 +358,36 @@ Use `--servername` to override the TLS Server Name Indication (SNI) value. This 
 
 ```bash
 tlsctl client --servername example.com 93.184.216.34:443
+```
+
+### STARTTLS support
+
+Use `--starttls` to negotiate a plaintext-to-TLS upgrade before inspecting the certificate. Supported protocols: `smtp`, `imap`, `pop3`, `ldap`.
+
+When `--starttls` is used without an explicit port, the default port for the protocol is used automatically:
+
+| Protocol | Default port |
+|----------|-------------|
+| `smtp`   | 587         |
+| `imap`   | 143         |
+| `pop3`   | 110         |
+| `ldap`   | 389         |
+
+```bash
+# SMTP STARTTLS (connects to port 587 by default)
+tlsctl client --starttls smtp mail.example.com
+
+# SMTP on a custom port
+tlsctl client --starttls smtp mail.example.com:25
+
+# IMAP STARTTLS
+tlsctl client --starttls imap mail.example.com
+
+# POP3 STARTTLS
+tlsctl client --starttls pop3 mail.example.com
+
+# LDAP STARTTLS
+tlsctl client --starttls ldap ldap.example.com
 ```
 
 ### Parsing PEM files

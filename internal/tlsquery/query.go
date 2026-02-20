@@ -21,6 +21,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	}
 
 	probeVersions := !opts.DisableTLSProbe
+	startTLS := opts.StartTLS
 
 	host, _, _ := net.SplitHostPort(endpoint)
 	if config.ServerName == "" && host != "" {
@@ -34,7 +35,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 	verifiedConfig := config.Clone()
 	verifiedConfig.InsecureSkipVerify = false
-	certs, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig)
+	certs, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig, startTLS)
 	if err != nil {
 		var cve *tls.CertificateVerificationError
 		if !errors.As(err, &cve) {
@@ -42,7 +43,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		}
 		fallbackConfig := config.Clone()
 		fallbackConfig.InsecureSkipVerify = true
-		certs, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig)
+		certs, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig, startTLS)
 		if err2 != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err2)
 		}
@@ -50,7 +51,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		chain.Verified = false
 		chain.VerificationError = abbreviateVerifyError(cve.Err)
 		if probeVersions {
-			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, startTLS)
 		}
 		return chain, nil
 	}
@@ -58,7 +59,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	chain := buildChain(certs)
 	chain.Verified = true
 	if probeVersions {
-		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config)
+		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, startTLS)
 	}
 	return chain, nil
 }

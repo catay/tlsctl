@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([]*x509.Certificate, error) {
+func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLS ...string) ([]*x509.Certificate, error) {
 	var rawConn net.Conn
 	var err error
 	if proxyURL != nil {
@@ -19,6 +19,13 @@ func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config) ([
 	}
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
+	}
+
+	if len(startTLS) > 0 && startTLS[0] != "" {
+		if err := negotiateStartTLS(rawConn, startTLS[0]); err != nil {
+			rawConn.Close()
+			return nil, fmt.Errorf("STARTTLS negotiation failed: %w", err)
+		}
 	}
 
 	conn := tls.Client(rawConn, config)
@@ -55,12 +62,17 @@ func tlsVersionName(v uint16) string {
 
 // probeTLSVersions tests which TLS versions the server supports by attempting
 // a handshake with each version individually.
-func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config) []string {
+func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, startTLSProto ...string) []string {
 	versions := []uint16{
 		tls.VersionTLS10,
 		tls.VersionTLS11,
 		tls.VersionTLS12,
 		tls.VersionTLS13,
+	}
+
+	proto := ""
+	if len(startTLSProto) > 0 {
+		proto = startTLSProto[0]
 	}
 
 	var supported []string
@@ -79,6 +91,13 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		}
 		if err != nil {
 			continue
+		}
+
+		if proto != "" {
+			if err := negotiateStartTLS(rawConn, proto); err != nil {
+				rawConn.Close()
+				continue
+			}
 		}
 
 		conn := tls.Client(rawConn, cfg)

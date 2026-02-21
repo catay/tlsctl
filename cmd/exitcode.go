@@ -12,13 +12,21 @@ const (
 	ExitRuntimeError    = 1
 	ExitInsecure        = 2
 	ExitRevocationError = 3
+	ExitExpiring        = 4
 )
 
+// exitPriority defines the escalation order for exit codes.
+// Higher priority wins; once set, a lower-priority code cannot replace it.
+var exitPriority = map[int]int{
+	ExitOK:              0,
+	ExitExpiring:        1,
+	ExitInsecure:        2,
+	ExitRevocationError: 3,
+	ExitRuntimeError:    4,
+}
+
 func setExitCode(code int) {
-	if exitCode == ExitRuntimeError {
-		return
-	}
-	if code == ExitRuntimeError || code > exitCode {
+	if exitPriority[code] > exitPriority[exitCode] {
 		exitCode = code
 	}
 }
@@ -53,5 +61,10 @@ func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time) {
 	}
 	if now.After(notAfter) {
 		setExitCode(ExitInsecure)
+		return
+	}
+	daysUntilExpiry := int(notAfter.Sub(now).Hours() / 24)
+	if daysUntilExpiry <= 30 {
+		setExitCode(ExitExpiring)
 	}
 }

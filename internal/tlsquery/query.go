@@ -10,9 +10,6 @@ import (
 	"strings"
 )
 
-// TLSConfig allows customizing the TLS configuration for testing.
-var TLSConfig *tls.Config
-
 // Query connects to the given endpoint and retrieves certificate chain information.
 func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	config, err := buildConfig(opts)
@@ -33,44 +30,37 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
 
-	verifiedConfig := config.Clone()
-	verifiedConfig.InsecureSkipVerify = false
-	certs, err := dialAndHandshake(endpoint, proxyURL, verifiedConfig, startTLS)
-	if err != nil {
-		var cve *tls.CertificateVerificationError
-		if !errors.As(err, &cve) {
+	if opts.Insecure {
+		insecureConfig := config.Clone()
+		insecureConfig.InsecureSkipVerify = true
+		certs, err := dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS)
+		if err != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
-		}
-		fallbackConfig := config.Clone()
-		fallbackConfig.InsecureSkipVerify = true
-		certs, err2 := dialAndHandshake(endpoint, proxyURL, fallbackConfig, startTLS)
-		if err2 != nil {
-			return nil, fmt.Errorf("TLS handshake failed: %w", err2)
 		}
 		chain := buildChain(certs)
 		chain.Verified = false
-		chain.VerificationError = abbreviateVerifyError(cve.Err)
+		chain.VerificationError = "verification skipped (--insecure)"
 		if probeVersions {
-			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, startTLS)
+			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS)
 		}
 		return chain, nil
+	}
+
+	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS)
+	if err != nil {
+		return nil, fmt.Errorf("TLS handshake failed: %w", err)
 	}
 
 	chain := buildChain(certs)
 	chain.Verified = true
 	if probeVersions {
-		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, startTLS)
+		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, false, startTLS)
 	}
 	return chain, nil
 }
 
 func buildConfig(opts QueryOptions) (*tls.Config, error) {
-	config := TLSConfig
-	if config == nil {
-		config = &tls.Config{}
-	} else {
-		config = config.Clone()
-	}
+	config := &tls.Config{}
 
 	if opts.ServerName != "" {
 		config.ServerName = opts.ServerName

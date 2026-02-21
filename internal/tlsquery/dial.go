@@ -62,7 +62,7 @@ func tlsVersionName(v uint16) string {
 
 // probeTLSVersions tests which TLS versions the server supports by attempting
 // a handshake with each version individually.
-func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, startTLSProto ...string) []string {
+func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, insecure bool, startTLSProto ...string) []string {
 	versions := []uint16{
 		tls.VersionTLS10,
 		tls.VersionTLS11,
@@ -80,7 +80,7 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		cfg := baseConfig.Clone()
 		cfg.MinVersion = v
 		cfg.MaxVersion = v
-		cfg.InsecureSkipVerify = true
+		cfg.InsecureSkipVerify = insecure
 
 		var rawConn net.Conn
 		var err error

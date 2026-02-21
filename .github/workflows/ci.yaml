@@ -9,6 +9,9 @@ on:
       - ".goreleaser.yaml"
       - "VERSION"
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest

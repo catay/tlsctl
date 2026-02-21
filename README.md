@@ -93,8 +93,8 @@ tlsctl client example.com
 # Inspect multiple endpoints from a file (one per line)
 tlsctl client --file hosts.txt
 
-# Disable TLS version probing (faster for large lists)
-tlsctl client --no-tls-probe example.com
+# Probe supported TLS versions
+tlsctl client --tls-versions example.com
 
 # Use a custom port
 tlsctl client example.com:8443

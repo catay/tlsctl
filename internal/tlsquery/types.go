@@ -54,9 +54,9 @@ type ChainInfo struct {
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	CACertFile      string // Path to custom CA certificate file (PEM format)
-	Proxy           string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
-	DisableTLSProbe bool   // Skip probing supported TLS versions.
-	ServerName      string // SNI override for TLS handshake (useful when connecting by IP).
-	StartTLS        string // STARTTLS protocol: smtp, imap, pop3, ldap.
+	CACertFile  string // Path to custom CA certificate file (PEM format)
+	Proxy       string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
+	TLSVersions bool   // Probe and display supported TLS versions.
+	ServerName  string // SNI override for TLS handshake (useful when connecting by IP).
+	StartTLS    string // STARTTLS protocol: smtp, imap, pop3, ldap.
 }

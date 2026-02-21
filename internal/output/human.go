@@ -62,8 +62,8 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	fmt.Fprintf(w, "  Subject:  %s\n", leaf.Subject)
 	fmt.Fprintf(w, "  Issuer:   %s\n", leaf.Issuer)
 	fmt.Fprintf(w, "  Validity: %s → %s\n",
-		notBefore.Format("2006-01-02"),
-		notAfter.Format("2006-01-02"))
+		notBefore.UTC().Format("2006-01-02"),
+		notAfter.UTC().Format("2006-01-02"))
 
 	if len(leaf.SubjectAltNames) > 0 {
 		sans := leaf.SubjectAltNames

@@ -16,7 +16,7 @@ func NewChecker(client HTTPDoer, now func() time.Time) *Checker {
 		client = http.DefaultClient
 	}
 	if now == nil {
-		now = time.Now
+		now = func() time.Time { return time.Now().UTC() }
 	}
 	return &Checker{client: client, now: now}
 }
@@ -24,7 +24,7 @@ func NewChecker(client HTTPDoer, now func() time.Time) *Checker {
 func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Info {
 	now := c.now()
 	info := &Info{
-		CheckedAt: now.UTC().Format(time.RFC3339),
+		CheckedAt: now.Format(time.RFC3339),
 	}
 
 	methods := opts.Methods

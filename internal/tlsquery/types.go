@@ -59,4 +59,5 @@ type QueryOptions struct {
 	TLSVersions bool   // Probe and display supported TLS versions.
 	ServerName  string // SNI override for TLS handshake (useful when connecting by IP).
 	StartTLS    string // STARTTLS protocol: smtp, imap, pop3, ldap.
+	Insecure    bool   // Skip TLS certificate verification.
 }

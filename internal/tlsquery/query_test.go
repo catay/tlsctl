@@ -24,11 +24,7 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 	server, addr := startTestTLSServer(t, false)
 	defer server.Close()
 
-	oldConfig := TLSConfig
-	TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	defer func() { TLSConfig = oldConfig }()
-
-	chain, err := Query(addr, QueryOptions{})
+	chain, err := Query(addr, QueryOptions{Insecure: true})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
@@ -46,6 +42,12 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 	}
 	if len(leaf.SubjectAltNames) != 2 {
 		t.Errorf("expected 2 SANs, got %d", len(leaf.SubjectAltNames))
+	}
+	if chain.Verified {
+		t.Error("expected Verified to be false with Insecure option")
+	}
+	if chain.VerificationError == "" {
+		t.Error("expected VerificationError to be set with Insecure option")
 	}
 }
 
@@ -307,11 +309,7 @@ func TestQuery_ViaProxy(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, false)
 	defer cleanup()
 
-	oldConfig := TLSConfig
-	TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	defer func() { TLSConfig = oldConfig }()
-
-	chain, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr})
+	chain, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr, Insecure: true})
 	if err != nil {
 		t.Fatalf("Query via proxy failed: %v", err)
 	}
@@ -331,11 +329,7 @@ func TestQuery_ViaProxyWithAuth(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, true)
 	defer cleanup()
 
-	oldConfig := TLSConfig
-	TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	defer func() { TLSConfig = oldConfig }()
-
-	chain, err := Query(addr, QueryOptions{Proxy: "http://user:pass@" + proxyAddr})
+	chain, err := Query(addr, QueryOptions{Proxy: "http://user:pass@" + proxyAddr, Insecure: true})
 	if err != nil {
 		t.Fatalf("Query via proxy with auth failed: %v", err)
 	}
@@ -352,11 +346,7 @@ func TestQuery_ViaProxyAuthRequired(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, true)
 	defer cleanup()
 
-	oldConfig := TLSConfig
-	TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	defer func() { TLSConfig = oldConfig }()
-
-	_, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr})
+	_, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr, Insecure: true})
 	if err == nil {
 		t.Error("expected error when proxy requires auth but none provided")
 	}

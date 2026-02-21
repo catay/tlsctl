@@ -18,11 +18,18 @@ func TestSetExitCode(t *testing.T) {
 		{"zero to runtime error", ExitOK, ExitRuntimeError, ExitRuntimeError},
 		{"zero to insecure", ExitOK, ExitInsecure, ExitInsecure},
 		{"zero to revocation error", ExitOK, ExitRevocationError, ExitRevocationError},
+		{"zero to expiring", ExitOK, ExitExpiring, ExitExpiring},
+		{"expiring to insecure", ExitExpiring, ExitInsecure, ExitInsecure},
+		{"expiring to revocation error", ExitExpiring, ExitRevocationError, ExitRevocationError},
+		{"insecure to expiring is no-op", ExitInsecure, ExitExpiring, ExitInsecure},
 		{"insecure to revocation error", ExitInsecure, ExitRevocationError, ExitRevocationError},
 		{"revocation error to insecure is no-op", ExitRevocationError, ExitInsecure, ExitRevocationError},
+		{"revocation error to expiring is no-op", ExitRevocationError, ExitExpiring, ExitRevocationError},
 		{"runtime error is sticky", ExitRuntimeError, ExitInsecure, ExitRuntimeError},
 		{"runtime error stays over revocation", ExitRuntimeError, ExitRevocationError, ExitRuntimeError},
+		{"runtime error stays over expiring", ExitRuntimeError, ExitExpiring, ExitRuntimeError},
 		{"insecure to runtime error", ExitInsecure, ExitRuntimeError, ExitRuntimeError},
+		{"expiring to runtime error", ExitExpiring, ExitRuntimeError, ExitRuntimeError},
 	}
 
 	for _, tt := range tests {
@@ -71,6 +78,17 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 				}},
 			},
 			expected: ExitInsecure,
+		},
+		{
+			name: "expiring soon cert",
+			chain: &tlsquery.ChainInfo{
+				Verified: true,
+				Certificates: []tlsquery.CertInfo{{
+					Type:     "leaf",
+					NotAfter: "2026-07-01T00:00:00Z",
+				}},
+			},
+			expected: ExitExpiring,
 		},
 		{
 			name: "expired cert",

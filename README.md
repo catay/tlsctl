@@ -109,6 +109,7 @@ tlsctl pem cert.pem
 - `1` runtime error (e.g., connection or parsing failure)
 - `2` insecure or invalid (unverified, expired, or revoked)
 - `3` revocation error (revocation check failed)
+- `4` expiring soon (certificate expires within 30 days)
 
 ## Usage examples
 

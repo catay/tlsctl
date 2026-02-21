@@ -47,7 +47,7 @@ func newClientCmd() *cobra.Command {
 	var caCertFile string
 	var proxyURL string
 	var inputFile string
-	var noTLSProbe bool
+	var tlsVersions bool
 	var serverName string
 	var startTLS string
 	var rf revocationFlags
@@ -80,11 +80,11 @@ func newClientCmd() *cobra.Command {
 			}
 
 			opts := tlsquery.QueryOptions{
-				CACertFile:      caCertFile,
-				Proxy:           proxyURL,
-				DisableTLSProbe: noTLSProbe,
-				ServerName:      serverName,
-				StartTLS:        startTLS,
+				CACertFile:  caCertFile,
+				Proxy:       proxyURL,
+				TLSVersions: tlsVersions,
+				ServerName:  serverName,
+				StartTLS:    startTLS,
 			}
 
 			now := time.Now().UTC()
@@ -127,7 +127,7 @@ func newClientCmd() *cobra.Command {
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
-	cmd.Flags().BoolVar(&noTLSProbe, "no-tls-probe", false, "Disable TLS version probing")
+	cmd.Flags().BoolVar(&tlsVersions, "tls-versions", false, "Probe and display supported TLS versions")
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
 	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: smtp, imap, pop3, ldap")
 	addRevocationFlags(cmd, &rf)

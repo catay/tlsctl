@@ -20,7 +20,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		return nil, err
 	}
 
-	probeVersions := !opts.DisableTLSProbe
+	probeVersions := opts.TLSVersions
 	startTLS := opts.StartTLS
 
 	host, _, _ := net.SplitHostPort(endpoint)

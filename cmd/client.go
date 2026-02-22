@@ -112,8 +112,10 @@ func newClientCmd() *cobra.Command {
 				chains = append(chains, certInfo)
 			}
 
-			if err := renderChains(os.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
-				return err
+			if !quiet {
+				if err := renderChains(os.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
+					return err
+				}
 			}
 
 			if len(runtimeErrors) > 0 {

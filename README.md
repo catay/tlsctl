@@ -442,6 +442,15 @@ The default output uses color-coded status indicators:
 | `⚠` **secure** | Yellow | Certificate is verified but expires within the warning threshold (default: 30 days, configurable via `--expiry-warning`) |
 | `✗` **insecure** | Red | Certificate verification failed (with reason) |
 
+## Quiet mode
+
+Use `-q` or `--quiet` to suppress all informational and warning output. Only error messages are displayed. Exit codes are preserved, making this ideal for scripting and monitoring:
+
+```bash
+tlsctl client -q example.com
+echo $?   # 0 = ok, 2 = insecure, 4 = expiring soon, etc.
+```
+
 ## Disabling color
 
 Use `--no-color` to strip ANSI color codes from output, useful for piping to other tools or log ingestion:

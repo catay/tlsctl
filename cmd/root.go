@@ -21,9 +21,11 @@ var rootCmd = &cobra.Command{
 
 var exitCode int
 var noColor bool
+var quiet bool
 var expiryWarningDays int
 
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress informational and warning output")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().IntVar(&expiryWarningDays, "expiry-warning", 30,
 		fmt.Sprintf("Number of days before expiry to trigger a warning (%d-%d)", minExpiryWarningDays, maxExpiryWarningDays))

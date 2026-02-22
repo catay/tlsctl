@@ -91,7 +91,8 @@ func newClientCmd() *cobra.Command {
 
 			now := time.Now().UTC()
 			renderOpts := output.Options{
-				Now: func() time.Time { return now },
+				Now:               func() time.Time { return now },
+				ExpiryWarningDays: expiryWarningDays,
 			}
 
 			var chains []*tlsquery.ChainInfo
@@ -107,7 +108,7 @@ func newClientCmd() *cobra.Command {
 					runRevocationCheck(certInfo, rf.mode, rf.timeout, rf.softFail)
 				}
 
-				updateExitCodeForChain(certInfo, now)
+				updateExitCodeForChain(certInfo, now, expiryWarningDays)
 				chains = append(chains, certInfo)
 			}
 

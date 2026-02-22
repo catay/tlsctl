@@ -16,7 +16,8 @@ type MultiRenderer interface {
 }
 
 type Options struct {
-	Now func() time.Time
+	Now               func() time.Time
+	ExpiryWarningDays int
 }
 
 func (o Options) NowFunc() time.Time {
@@ -24,4 +25,11 @@ func (o Options) NowFunc() time.Time {
 		return time.Now().UTC()
 	}
 	return o.Now()
+}
+
+func (o Options) WarningDays() int {
+	if o.ExpiryWarningDays <= 0 {
+		return 30
+	}
+	return o.ExpiryWarningDays
 }

@@ -35,10 +35,11 @@ func newPemCmd() *cobra.Command {
 			}
 
 			now := time.Now().UTC()
-			updateExitCodeForChain(chainInfo, now)
+			updateExitCodeForChain(chainInfo, now, expiryWarningDays)
 
 			renderOpts := output.Options{
-				Now: func() time.Time { return now },
+				Now:               func() time.Time { return now },
+				ExpiryWarningDays: expiryWarningDays,
 			}
 			return renderChains(os.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
 		},

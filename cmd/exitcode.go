@@ -31,7 +31,7 @@ func setExitCode(code int) {
 	}
 }
 
-func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time) {
+func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time, warningDays ...int) {
 	if chain == nil {
 		return
 	}
@@ -63,8 +63,12 @@ func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time) {
 		setExitCode(ExitInsecure)
 		return
 	}
+	threshold := 30
+	if len(warningDays) > 0 && warningDays[0] > 0 {
+		threshold = warningDays[0]
+	}
 	daysUntilExpiry := int(notAfter.Sub(now).Hours() / 24)
-	if daysUntilExpiry <= 30 {
+	if daysUntilExpiry <= threshold {
 		setExitCode(ExitExpiring)
 	}
 }

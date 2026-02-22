@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options) []Result {
+func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options, now time.Time) []Result {
 	if len(leaf.CRLDistributionPoints) == 0 {
 		return []Result{{
 			Method: MethodCRL,
@@ -24,7 +24,7 @@ func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options) []Resul
 	}
 
 	for _, dp := range leaf.CRLDistributionPoints {
-		result := c.fetchAndCheckCRL(leaf, issuer, dp, timeout)
+		result := c.fetchAndCheckCRL(leaf, issuer, dp, timeout, now)
 		if result.Status == StatusGood || result.Status == StatusRevoked {
 			return []Result{result}
 		}
@@ -43,7 +43,7 @@ func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options) []Resul
 	}}
 }
 
-func (c *Checker) fetchAndCheckCRL(leaf, issuer *x509.Certificate, dpURL string, timeout time.Duration) Result {
+func (c *Checker) fetchAndCheckCRL(leaf, issuer *x509.Certificate, dpURL string, timeout time.Duration, now time.Time) Result {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -108,7 +108,6 @@ func (c *Checker) fetchAndCheckCRL(leaf, issuer *x509.Certificate, dpURL string,
 		}
 	}
 
-	now := c.now()
 	if now.After(crl.NextUpdate) && !crl.NextUpdate.IsZero() {
 		return Result{
 			Method:       MethodCRL,

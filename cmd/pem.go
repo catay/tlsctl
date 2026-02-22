@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"time"
 
 	"github.com/catay/tlsctl/internal/output"
@@ -9,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPemCmd() *cobra.Command {
+func newPemCmd(rt *Runtime) *cobra.Command {
 	var outputFormat string
 	var caCertFile string
 	var rf revocationFlags
@@ -37,8 +36,8 @@ func newPemCmd() *cobra.Command {
 				runRevocationCheck(chainInfo, rf.mode, rf.timeout, rf.softFail)
 			}
 
-			now := time.Now().UTC()
-			updateExitCodeForChain(chainInfo, now, expiryWarningDays)
+			now := rt.NowFunc()
+			updateExitCodeForChain(rt.ExitTracker, chainInfo, now, expiryWarningDays)
 
 			renderOpts := output.Options{
 				Now:               func() time.Time { return now },
@@ -47,7 +46,7 @@ func newPemCmd() *cobra.Command {
 			if quiet {
 				return nil
 			}
-			return renderChains(os.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
+			return renderChains(rt.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
 		},
 	}
 
@@ -60,5 +59,5 @@ func newPemCmd() *cobra.Command {
 }
 
 func init() {
-	rootCmd.AddCommand(newPemCmd())
+	rootCmd.AddCommand(newPemCmd(defaultRuntime))
 }

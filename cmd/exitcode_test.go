@@ -34,12 +34,12 @@ func TestSetExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exitCode = tt.initial
-			setExitCode(tt.set)
-			if exitCode != tt.expected {
-				t.Errorf("setExitCode(%d) with initial %d: got %d, want %d", tt.set, tt.initial, exitCode, tt.expected)
+			tracker := NewExitTracker()
+			tracker.Set(tt.initial)
+			tracker.Set(tt.set)
+			if tracker.Code() != tt.expected {
+				t.Errorf("setExitCode(%d) with initial %d: got %d, want %d", tt.set, tt.initial, tracker.Code(), tt.expected)
 			}
-			exitCode = ExitOK // reset
 		})
 	}
 }
@@ -133,12 +133,11 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exitCode = ExitOK
-			updateExitCodeForChain(tt.chain, now)
-			if exitCode != tt.expected {
-				t.Errorf("got exit code %d, want %d", exitCode, tt.expected)
+			tracker := NewExitTracker()
+			updateExitCodeForChain(tracker, tt.chain, now)
+			if tracker.Code() != tt.expected {
+				t.Errorf("got exit code %d, want %d", tracker.Code(), tt.expected)
 			}
-			exitCode = ExitOK // reset
 		})
 	}
 }

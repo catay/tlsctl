@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/ocsp"
 )
 
-func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options) []Result {
+func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options, now time.Time) []Result {
 	if issuer == nil {
 		return []Result{{
 			Method: MethodOCSP,
@@ -35,7 +35,7 @@ func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options) []Resu
 	}
 
 	for _, responderURL := range leaf.OCSPServer {
-		result := c.fetchAndCheckOCSP(leaf, issuer, responderURL, timeout)
+		result := c.fetchAndCheckOCSP(leaf, issuer, responderURL, timeout, now)
 		if result.Status == StatusGood || result.Status == StatusRevoked {
 			return []Result{result}
 		}
@@ -54,7 +54,7 @@ func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options) []Resu
 	}}
 }
 
-func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL string, timeout time.Duration) Result {
+func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL string, timeout time.Duration, now time.Time) Result {
 	ocspReq, err := ocsp.CreateRequest(leaf, issuer, nil)
 	if err != nil {
 		return Result{
@@ -119,7 +119,6 @@ func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL
 		}
 	}
 
-	now := c.now()
 	if now.After(ocspResp.NextUpdate) && !ocspResp.NextUpdate.IsZero() {
 		return Result{
 			Method:       MethodOCSP,

@@ -22,7 +22,11 @@ func NewChecker(client HTTPDoer, now func() time.Time) *Checker {
 }
 
 func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Info {
-	now := c.now()
+	nowFunc := c.now
+	if opts.Now != nil {
+		nowFunc = opts.Now
+	}
+	now := nowFunc()
 	info := &Info{
 		CheckedAt: now.Format(time.RFC3339),
 	}
@@ -36,9 +40,9 @@ func (c *Checker) CheckCert(leaf, issuer *x509.Certificate, opts Options) *Info 
 		var results []Result
 		switch method {
 		case MethodCRL:
-			results = c.checkCRL(leaf, issuer, opts)
+			results = c.checkCRL(leaf, issuer, opts, now)
 		case MethodOCSP:
-			results = c.checkOCSP(leaf, issuer, opts)
+			results = c.checkOCSP(leaf, issuer, opts, now)
 		}
 		info.Results = append(info.Results, results...)
 	}

@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/catay/tlsctl/internal/cli"
@@ -42,7 +44,7 @@ func validateRevocationMode(mode string) error {
 	return nil
 }
 
-func newClientCmd() *cobra.Command {
+func newClientCmd(rt *Runtime) *cobra.Command {
 	var outputFormat string
 	var caCertFile string
 	var proxyURL string
@@ -92,40 +94,42 @@ func newClientCmd() *cobra.Command {
 				Insecure:    insecure,
 			}
 
-			now := time.Now().UTC()
+			now := rt.NowFunc()
 			renderOpts := output.Options{
 				Now:               func() time.Time { return now },
 				ExpiryWarningDays: expiryWarningDays,
 			}
 
+			var revocationFn func(*tlsquery.ChainInfo)
+			if rf.mode != "off" && rf.mode != "" {
+				revocationFn = func(chain *tlsquery.ChainInfo) {
+					runRevocationCheck(chain, rf.mode, rf.timeout, rf.softFail)
+				}
+			}
+
+			results := queryTargets(targets, opts, revocationFn)
 			var chains []*tlsquery.ChainInfo
 			var runtimeErrors []error
-			for _, endpoint := range targets {
-				certInfo, err := tlsquery.Query(endpoint, opts)
-				if err != nil {
-					runtimeErrors = append(runtimeErrors, fmt.Errorf("%s: %w", endpoint, err))
+			for _, result := range results {
+				if result.err != nil {
+					runtimeErrors = append(runtimeErrors, fmt.Errorf("%s: %w", result.endpoint, result.err))
 					continue
 				}
-
-				if rf.mode != "off" && rf.mode != "" {
-					runRevocationCheck(certInfo, rf.mode, rf.timeout, rf.softFail)
-				}
-
-				updateExitCodeForChain(certInfo, now, expiryWarningDays)
-				chains = append(chains, certInfo)
+				updateExitCodeForChain(rt.ExitTracker, result.chain, now, expiryWarningDays)
+				chains = append(chains, result.chain)
 			}
 
 			if !quiet {
-				if err := renderChains(os.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
+				if err := renderChains(rt.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
 					return err
 				}
 			}
 
 			if len(runtimeErrors) > 0 {
 				for _, err := range runtimeErrors {
-					fmt.Fprintln(os.Stderr, err)
+					fmt.Fprintln(rt.Stderr, err)
 				}
-				setExitCode(ExitRuntimeError)
+				rt.ExitTracker.Set(ExitRuntimeError)
 			}
 			return nil
 		},
@@ -177,6 +181,74 @@ func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Dur
 
 	result := checker.CheckCert(leaf, issuer, opts)
 	chain.Certificates[0].Revocation = result
+}
+
+type targetJob struct {
+	index    int
+	endpoint string
+}
+
+type targetResult struct {
+	index    int
+	endpoint string
+	chain    *tlsquery.ChainInfo
+	err      error
+}
+
+func queryTargets(targets []string, opts tlsquery.QueryOptions, revocationFn func(*tlsquery.ChainInfo)) []targetResult {
+	results := make([]targetResult, len(targets))
+	if len(targets) == 0 {
+		return results
+	}
+
+	workerCount := runtime.GOMAXPROCS(0)
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	if workerCount > len(targets) {
+		workerCount = len(targets)
+	}
+
+	jobs := make(chan targetJob)
+	resultCh := make(chan targetResult, workerCount)
+	var wg sync.WaitGroup
+
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				chain, err := tlsquery.Query(job.endpoint, opts)
+				if err == nil && revocationFn != nil {
+					revocationFn(chain)
+				}
+				resultCh <- targetResult{
+					index:    job.index,
+					endpoint: job.endpoint,
+					chain:    chain,
+					err:      err,
+				}
+			}
+		}()
+	}
+
+	go func() {
+		for index, endpoint := range targets {
+			jobs <- targetJob{index: index, endpoint: endpoint}
+		}
+		close(jobs)
+	}()
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	for result := range resultCh {
+		results[result.index] = result
+	}
+
+	return results
 }
 
 func collectTargets(args []string, inputFile string, startTLSProto ...string) ([]string, error) {
@@ -234,6 +306,7 @@ func readTargetsFromFile(path string) ([]string, error) {
 
 	var targets []string
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -281,5 +354,5 @@ func renderChains(w io.Writer, format output.Format, chains []*tlsquery.ChainInf
 }
 
 func init() {
-	rootCmd.AddCommand(newClientCmd())
+	rootCmd.AddCommand(newClientCmd(defaultRuntime))
 }

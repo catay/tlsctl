@@ -1,10 +1,16 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+)
+
+const (
+	minExpiryWarningDays = 1
+	maxExpiryWarningDays = 10000
 )
 
 var rootCmd = &cobra.Command{
@@ -15,13 +21,20 @@ var rootCmd = &cobra.Command{
 
 var exitCode int
 var noColor bool
+var expiryWarningDays int
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+	rootCmd.PersistentFlags().IntVar(&expiryWarningDays, "expiry-warning", 30,
+		fmt.Sprintf("Number of days before expiry to trigger a warning (%d-%d)", minExpiryWarningDays, maxExpiryWarningDays))
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if noColor {
 			color.NoColor = true
 		}
+		if expiryWarningDays < minExpiryWarningDays || expiryWarningDays > maxExpiryWarningDays {
+			return fmt.Errorf("--expiry-warning must be between %d and %d", minExpiryWarningDays, maxExpiryWarningDays)
+		}
+		return nil
 	}
 }
 

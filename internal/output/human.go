@@ -46,7 +46,7 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	case now.After(notAfter):
 		status = bold.Add(color.FgRed).Sprint("✗")
 		statusMsg = expiryMsg
-	case daysUntilExpiry <= 30:
+	case daysUntilExpiry <= opts.WarningDays():
 		status = bold.Add(color.FgYellow).Sprint("⚠")
 		label := color.New(color.Bold, color.FgYellow).Sprint("secure")
 		statusMsg = fmt.Sprintf("%s, expires in %d days", label, daysUntilExpiry)

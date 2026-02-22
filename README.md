@@ -109,7 +109,7 @@ tlsctl pem cert.pem
 - `1` runtime error (e.g., connection or parsing failure)
 - `2` insecure or invalid (unverified, expired, or revoked)
 - `3` revocation error (revocation check failed)
-- `4` expiring soon (certificate expires within 30 days)
+- `4` expiring soon (certificate expires within 30 days, configurable via `--expiry-warning`)
 
 ## Usage examples
 
@@ -439,7 +439,7 @@ The default output uses color-coded status indicators:
 | Indicator | Color | Meaning |
 |-----------|-------|---------|
 | `✓` **secure** | Green | Certificate is valid and verified |
-| `⚠` **secure** | Yellow | Certificate is verified but expires within 30 days |
+| `⚠` **secure** | Yellow | Certificate is verified but expires within the warning threshold (default: 30 days, configurable via `--expiry-warning`) |
 | `✗` **insecure** | Red | Certificate verification failed (with reason) |
 
 ## Disabling color

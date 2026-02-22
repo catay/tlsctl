@@ -16,7 +16,9 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("tlsctl version %s (commit: %s, built: %s)\n", version, commit, date)
+		if !quiet {
+			fmt.Printf("tlsctl version %s (commit: %s, built: %s)\n", version, commit, date)
+		}
 	},
 }
 

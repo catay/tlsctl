@@ -41,6 +41,9 @@ func newPemCmd() *cobra.Command {
 				Now:               func() time.Time { return now },
 				ExpiryWarningDays: expiryWarningDays,
 			}
+			if quiet {
+				return nil
+			}
 			return renderChains(os.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
 		},
 	}

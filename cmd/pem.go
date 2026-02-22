@@ -20,6 +20,9 @@ func newPemCmd() *cobra.Command {
 		Long:  `Reads a PEM file and displays certificate metadata for all certificates found.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateCertFlags(); err != nil {
+				return err
+			}
 			if err := validateRevocationMode(rf.mode); err != nil {
 				return err
 			}
@@ -51,6 +54,7 @@ func newPemCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	addRevocationFlags(cmd, &rf)
+	addCertFlags(cmd)
 
 	return cmd
 }

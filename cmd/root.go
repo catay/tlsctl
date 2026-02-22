@@ -24,17 +24,24 @@ var noColor bool
 var quiet bool
 var expiryWarningDays int
 
-func init() {
-	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress informational and warning output")
-	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
-	rootCmd.PersistentFlags().IntVar(&expiryWarningDays, "expiry-warning", 30,
+func addCertFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Suppress informational and warning output")
+	cmd.Flags().IntVar(&expiryWarningDays, "expiry-warning", 30,
 		fmt.Sprintf("Number of days before expiry to trigger a warning (%d-%d)", minExpiryWarningDays, maxExpiryWarningDays))
+}
+
+func validateCertFlags() error {
+	if expiryWarningDays < minExpiryWarningDays || expiryWarningDays > maxExpiryWarningDays {
+		return fmt.Errorf("--expiry-warning must be between %d and %d", minExpiryWarningDays, maxExpiryWarningDays)
+	}
+	return nil
+}
+
+func init() {
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if noColor {
 			color.NoColor = true
-		}
-		if expiryWarningDays < minExpiryWarningDays || expiryWarningDays > maxExpiryWarningDays {
-			return fmt.Errorf("--expiry-warning must be between %d and %d", minExpiryWarningDays, maxExpiryWarningDays)
 		}
 		return nil
 	}

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"sync"
 	"time"
 
 	"github.com/catay/tlsctl/internal/revocation"
@@ -25,14 +26,46 @@ var exitPriority = map[int]int{
 	ExitRuntimeError:    4,
 }
 
-func setExitCode(code int) {
-	if exitPriority[code] > exitPriority[exitCode] {
-		exitCode = code
+type ExitTracker struct {
+	mu   sync.Mutex
+	code int
+}
+
+func NewExitTracker() *ExitTracker {
+	return &ExitTracker{code: ExitOK}
+}
+
+func (t *ExitTracker) Code() int {
+	if t == nil {
+		return ExitOK
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.code
+}
+
+func (t *ExitTracker) Reset() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.code = ExitOK
+	t.mu.Unlock()
+}
+
+func (t *ExitTracker) Set(code int) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if exitPriority[code] > exitPriority[t.code] {
+		t.code = code
 	}
 }
 
-func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time, warningDays ...int) {
-	if chain == nil {
+func updateExitCodeForChain(tracker *ExitTracker, chain *tlsquery.ChainInfo, now time.Time, warningDays ...int) {
+	if chain == nil || tracker == nil {
 		return
 	}
 	leaf, err := chain.Leaf()
@@ -41,17 +74,17 @@ func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time, warningDay
 	}
 
 	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusError {
-		setExitCode(ExitRevocationError)
+		tracker.Set(ExitRevocationError)
 		return
 	}
 
 	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusRevoked {
-		setExitCode(ExitInsecure)
+		tracker.Set(ExitInsecure)
 		return
 	}
 
 	if !chain.Verified {
-		setExitCode(ExitInsecure)
+		tracker.Set(ExitInsecure)
 		return
 	}
 
@@ -60,7 +93,7 @@ func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time, warningDay
 		return
 	}
 	if now.After(notAfter) {
-		setExitCode(ExitInsecure)
+		tracker.Set(ExitInsecure)
 		return
 	}
 	threshold := 30
@@ -69,6 +102,6 @@ func updateExitCodeForChain(chain *tlsquery.ChainInfo, now time.Time, warningDay
 	}
 	daysUntilExpiry := int(notAfter.Sub(now).Hours() / 24)
 	if daysUntilExpiry <= threshold {
-		setExitCode(ExitExpiring)
+		tracker.Set(ExitExpiring)
 	}
 }

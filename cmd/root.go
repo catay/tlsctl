@@ -13,13 +13,9 @@ const (
 	maxExpiryWarningDays = 10000
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "tlsctl",
-	Short: "A CLI tool for TLS certificate operations",
-	Long:  `tlsctl provides commands for querying and inspecting TLS certificates.`,
-}
+var defaultRuntime = NewRuntime()
 
-var exitCode int
+var rootCmd = newRootCmd(defaultRuntime)
 var noColor bool
 var quiet bool
 var expiryWarningDays int
@@ -51,7 +47,16 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-	if exitCode != 0 {
-		os.Exit(exitCode)
+	if code := defaultRuntime.ExitTracker.Code(); code != 0 {
+		os.Exit(code)
+	}
+}
+
+func newRootCmd(rt *Runtime) *cobra.Command {
+	_ = rt
+	return &cobra.Command{
+		Use:   "tlsctl",
+		Short: "A CLI tool for TLS certificate operations",
+		Long:  `tlsctl provides commands for querying and inspecting TLS certificates.`,
 	}
 }

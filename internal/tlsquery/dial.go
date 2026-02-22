@@ -9,28 +9,15 @@ import (
 	"time"
 )
 
+const (
+	defaultDialTimeout = 10 * time.Second
+	probeDialTimeout   = 5 * time.Second
+)
+
 func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLS ...string) ([]*x509.Certificate, error) {
-	var rawConn net.Conn
-	var err error
-	if proxyURL != nil {
-		rawConn, err = dialViaProxy(endpoint, proxyURL, 10*time.Second)
-	} else {
-		rawConn, err = (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", endpoint)
-	}
+	proto := startTLSProtocol(startTLS)
+	conn, err := dialTLS(endpoint, proxyURL, config, defaultDialTimeout, proto)
 	if err != nil {
-		return nil, fmt.Errorf("connection failed: %w", err)
-	}
-
-	if len(startTLS) > 0 && startTLS[0] != "" {
-		if err := negotiateStartTLS(rawConn, startTLS[0]); err != nil {
-			rawConn.Close()
-			return nil, fmt.Errorf("STARTTLS negotiation failed: %w", err)
-		}
-	}
-
-	conn := tls.Client(rawConn, config)
-	if err := conn.Handshake(); err != nil {
-		rawConn.Close()
 		return nil, err
 	}
 	defer conn.Close()
@@ -70,10 +57,7 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		tls.VersionTLS13,
 	}
 
-	proto := ""
-	if len(startTLSProto) > 0 {
-		proto = startTLSProto[0]
-	}
+	proto := startTLSProtocol(startTLSProto)
 
 	var supported []string
 	for _, v := range versions {
@@ -82,31 +66,49 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		cfg.MaxVersion = v
 		cfg.InsecureSkipVerify = insecure
 
-		var rawConn net.Conn
-		var err error
-		if proxyURL != nil {
-			rawConn, err = dialViaProxy(endpoint, proxyURL, 5*time.Second)
-		} else {
-			rawConn, err = (&net.Dialer{Timeout: 5 * time.Second}).Dial("tcp", endpoint)
-		}
+		conn, err := dialTLS(endpoint, proxyURL, cfg, probeDialTimeout, proto)
 		if err != nil {
 			continue
 		}
-
-		if proto != "" {
-			if err := negotiateStartTLS(rawConn, proto); err != nil {
-				rawConn.Close()
-				continue
-			}
-		}
-
-		conn := tls.Client(rawConn, cfg)
-		err = conn.Handshake()
 		conn.Close()
-		if err == nil {
-			supported = append(supported, tlsVersionName(v))
-		}
+		supported = append(supported, tlsVersionName(v))
 	}
 
 	return supported
+}
+
+func dialTLS(endpoint string, proxyURL *url.URL, config *tls.Config, timeout time.Duration, startTLSProto string) (*tls.Conn, error) {
+	rawConn, err := dialTCP(endpoint, proxyURL, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("connection failed: %w", err)
+	}
+
+	if startTLSProto != "" {
+		if err := negotiateStartTLS(rawConn, startTLSProto); err != nil {
+			rawConn.Close()
+			return nil, fmt.Errorf("STARTTLS negotiation failed: %w", err)
+		}
+	}
+
+	conn := tls.Client(rawConn, config)
+	if err := conn.Handshake(); err != nil {
+		rawConn.Close()
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func dialTCP(endpoint string, proxyURL *url.URL, timeout time.Duration) (net.Conn, error) {
+	if proxyURL != nil {
+		return dialViaProxy(endpoint, proxyURL, timeout)
+	}
+	return (&net.Dialer{Timeout: timeout}).Dial("tcp", endpoint)
+}
+
+func startTLSProtocol(protocols []string) string {
+	if len(protocols) > 0 {
+		return protocols[0]
+	}
+	return ""
 }

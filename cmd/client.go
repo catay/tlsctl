@@ -67,6 +67,9 @@ func newClientCmd() *cobra.Command {
 			return fmt.Errorf("must provide at least one endpoint or --file")
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateCertFlags(); err != nil {
+				return err
+			}
 			if err := validateRevocationMode(rf.mode); err != nil {
 				return err
 			}
@@ -137,6 +140,7 @@ func newClientCmd() *cobra.Command {
 	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: smtp, imap, pop3, ldap")
 	cmd.Flags().BoolVarP(&insecure, "insecure", "k", false, "Skip TLS certificate verification")
 	addRevocationFlags(cmd, &rf)
+	addCertFlags(cmd)
 
 	return cmd
 }

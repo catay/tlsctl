@@ -76,3 +76,11 @@ git pull origin main
 ```
 
 Report success to the user with the merged PR URL.
+
+## Creating a Release
+
+When the user asks to create a new release (e.g., "new release", "cut a release"):
+
+- Update the `VERSION` file with the new version number
+- Update all version references in the "Pre-built binaries" section of `README.md`: the archive filenames and download URLs in the platform table, and the `curl` install example
+- Then follow the normal commit workflow above with message `chore: bump version to <version>`

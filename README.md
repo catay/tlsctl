@@ -12,6 +12,24 @@
 </p>
 </h1>
 
+## Table of Contents
+
+- [About](#about)
+- [Why tlsctl?](#why-tlsctl)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Exit codes](#exit-codes)
+- [Usage examples](#usage-examples)
+- [Output formats](#output-formats)
+- [Status indicators](#status-indicators)
+- [Quiet mode](#quiet-mode)
+- [Disabling color](#disabling-color)
+- [Revocation checking](#revocation-checking)
+- [Certificate fields](#certificate-fields)
+- [Testing with badssl.com](#testing-with-badsslcom)
+- [Shell completion](#shell-completion)
+- [License](#license)
+
 ## About
 
 **tlsctl** is a fast, zero-config command-line tool for inspecting TLS certificates from remote endpoints or local PEM files. Get instant visibility into certificate chains, expiry status, revocation state, and more — all from your terminal.

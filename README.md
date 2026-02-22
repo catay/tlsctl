@@ -18,9 +18,10 @@
 - [Why tlsctl?](#why-tlsctl)
 - [Installation](#installation)
 - [Quick start](#quick-start)
-- [Exit codes](#exit-codes)
-- [Usage examples](#usage-examples)
+- [Basic usage](#basic-usage)
+- [Advanced usage](#advanced-usage)
 - [Output formats](#output-formats)
+- [Exit codes](#exit-codes)
 - [Status indicators](#status-indicators)
 - [Quiet mode](#quiet-mode)
 - [Disabling color](#disabling-color)
@@ -121,15 +122,7 @@ tlsctl client example.com:8443
 tlsctl pem cert.pem
 ```
 
-## Exit codes
-
-- `0` ok
-- `1` runtime error (e.g., connection or parsing failure)
-- `2` insecure or invalid (unverified, expired, or revoked)
-- `3` revocation error (revocation check failed)
-- `4` expiring soon (certificate expires within 30 days, configurable via `--expiry-warning`)
-
-## Usage examples
+## Basic usage
 
 ### Inspecting valid certificates
 
@@ -440,6 +433,36 @@ tlsctl pem -o yaml cert.pem
 tlsctl pem --revocation crl cert.pem
 ```
 
+## Advanced usage
+
+The JSON output (`-o json`) pairs well with [jq](https://jqlang.github.io/jq/) for extracting specific fields:
+
+```bash
+# Get the SHA-256 fingerprint of the leaf certificate
+tlsctl client -o json example.com | jq -r '.certificates[] | select(.type == "leaf") | .fingerprint.sha256'
+
+# List all Subject Alternative Names (SANs)
+tlsctl client -o json example.com | jq -r '.certificates[] | select(.type == "leaf") | .subject_alternative_names[]'
+
+# Show expiry date for each certificate in the chain
+tlsctl client -o json example.com | jq -r '.certificates[] | "\(.type): \(.common_name) expires \(.not_after)"'
+
+# Check if the certificate is verified
+tlsctl client -o json example.com | jq '.verified'
+
+# Extract the issuer and subject of the leaf certificate
+tlsctl client -o json example.com | jq '.certificates[] | select(.type == "leaf") | {subject, issuer}'
+
+# Get serial numbers of all certificates in the chain
+tlsctl client -o json example.com | jq -r '.certificates[] | "\(.type): \(.serial_number)"'
+
+# Count the number of SANs on the leaf certificate
+tlsctl client -o json example.com | jq '.certificates[] | select(.type == "leaf") | .subject_alternative_names | length'
+
+# Check multiple hosts and report their expiry dates
+tlsctl client -o json google.com github.com | jq -r '.[] | .certificates[] | select(.type == "leaf") | "\(.common_name) expires \(.not_after)"'
+```
+
 ## Output formats
 
 | Format | Flag | Description |
@@ -449,6 +472,14 @@ tlsctl pem --revocation crl cert.pem
 | JSON | `-o json` | Full structured JSON, ideal for scripting and automation |
 | YAML | `-o yaml` | Full structured YAML |
 | Raw | `-o raw` | PEM-encoded certificates |
+
+## Exit codes
+
+- `0` ok
+- `1` runtime error (e.g., connection or parsing failure)
+- `2` insecure or invalid (unverified, expired, or revoked)
+- `3` revocation error (revocation check failed)
+- `4` expiring soon (certificate expires within 30 days, configurable via `--expiry-warning`)
 
 ## Status indicators
 

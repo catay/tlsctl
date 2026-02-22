@@ -21,9 +21,3 @@
 - Prefer stdlib over external dependencies
 - Use table-driven tests; keep functions small and focused
 - Error handling: return errors, don't panic; wrap with context
-- Conventional Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`
-
-## Git Workflow
-- Branch naming: `feat/feature-name`, `fix/bug-name`
-- Squash commits; run tests before committing
-- Request approval before merging to `main`

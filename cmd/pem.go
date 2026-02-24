@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/catay/tlsctl/internal/output"
@@ -14,10 +17,10 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 	var rf revocationFlags
 
 	cmd := &cobra.Command{
-		Use:   "pem FILE",
-		Short: "Parse and display certificates from a PEM file",
-		Long:  `Reads a PEM file and displays certificate metadata for all certificates found.`,
-		Args:  cobra.ExactArgs(1),
+		Use:   "pem [FILE | -]",
+		Short: "Parse and display certificates from a PEM file or stdin",
+		Long:  `Reads a PEM file (or stdin when '-' is given) and displays certificate metadata for all certificates found.`,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateCertFlags(); err != nil {
 				return err
@@ -27,7 +30,26 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 			}
 
 			opts := tlsquery.PEMOptions{CACertFile: caCertFile}
-			chainInfo, err := tlsquery.ParsePEMFile(args[0], opts)
+
+			var chainInfo *tlsquery.ChainInfo
+			var err error
+
+			if len(args) == 0 || args[0] == "-" {
+				if len(args) == 0 {
+					// No args: require piped stdin
+					stat, sErr := os.Stdin.Stat()
+					if sErr != nil || stat.Mode()&os.ModeCharDevice != 0 {
+						return fmt.Errorf("no input: provide a FILE argument or pipe PEM data to stdin")
+					}
+				}
+				data, rErr := io.ReadAll(os.Stdin)
+				if rErr != nil {
+					return fmt.Errorf("failed to read stdin: %w", rErr)
+				}
+				chainInfo, err = tlsquery.ParsePEM(data, opts)
+			} else {
+				chainInfo, err = tlsquery.ParsePEMFile(args[0], opts)
+			}
 			if err != nil {
 				return err
 			}

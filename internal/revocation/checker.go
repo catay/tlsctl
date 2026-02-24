@@ -58,7 +58,11 @@ func computeOverallStatus(results []Result) Status {
 
 	hasGood := false
 	hasError := false
+	allNotSupported := true
 	for _, r := range results {
+		if r.Status != StatusNotSupported {
+			allNotSupported = false
+		}
 		switch r.Status {
 		case StatusRevoked:
 			return StatusRevoked
@@ -71,6 +75,9 @@ func computeOverallStatus(results []Result) Status {
 
 	if hasGood {
 		return StatusGood
+	}
+	if allNotSupported {
+		return StatusNotSupported
 	}
 	if hasError {
 		return StatusError

@@ -13,7 +13,7 @@ func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options, now tim
 	if len(leaf.CRLDistributionPoints) == 0 {
 		return []Result{{
 			Method: MethodCRL,
-			Status: StatusNotChecked,
+			Status: StatusNotSupported,
 			Error:  "no CRL distribution points",
 		}}
 	}

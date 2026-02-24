@@ -26,20 +26,22 @@ type revocationFlags struct {
 }
 
 var validRevocationModes = map[string]bool{
-	"off":  true,
 	"crl":  true,
 	"ocsp": true,
 }
 
 func addRevocationFlags(cmd *cobra.Command, rf *revocationFlags) {
-	cmd.Flags().StringVar(&rf.mode, "revocation", "off", "Revocation check mode: off, crl, ocsp")
+	cmd.Flags().StringVar(&rf.mode, "revocation", "", "Revocation check mode: crl, ocsp")
 	cmd.Flags().DurationVar(&rf.timeout, "revocation-timeout", 5*time.Second, "Timeout for revocation checks")
 	cmd.Flags().BoolVar(&rf.softFail, "revocation-soft-fail", true, "Treat revocation check errors as unknown (soft-fail)")
 }
 
 func validateRevocationMode(mode string) error {
+	if mode == "" {
+		return nil
+	}
 	if !validRevocationModes[mode] {
-		return fmt.Errorf("invalid revocation mode %q: must be one of off, crl, ocsp", mode)
+		return fmt.Errorf("invalid revocation mode %q: must be one of crl, ocsp", mode)
 	}
 	return nil
 }
@@ -101,7 +103,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			}
 
 			var revocationFn func(*tlsquery.ChainInfo)
-			if rf.mode != "off" && rf.mode != "" {
+			if rf.mode != "" {
 				revocationFn = func(chain *tlsquery.ChainInfo) {
 					runRevocationCheck(chain, rf.mode, rf.timeout, rf.softFail)
 				}

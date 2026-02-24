@@ -16,11 +16,12 @@ const (
 type Status string
 
 const (
-	StatusGood       Status = "good"
-	StatusRevoked    Status = "revoked"
-	StatusUnknown    Status = "unknown"
-	StatusNotChecked Status = "not_checked"
-	StatusError      Status = "error"
+	StatusGood         Status = "good"
+	StatusRevoked      Status = "revoked"
+	StatusUnknown      Status = "unknown"
+	StatusNotChecked   Status = "not_checked"
+	StatusNotSupported Status = "not_supported"
+	StatusError        Status = "error"
 )
 
 type Result struct {

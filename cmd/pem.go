@@ -32,7 +32,7 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rf.mode != "off" && rf.mode != "" {
+			if rf.mode != "" {
 				runRevocationCheck(chainInfo, rf.mode, rf.timeout, rf.softFail)
 			}
 

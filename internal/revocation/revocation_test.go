@@ -237,14 +237,14 @@ func TestCheckCRL_NoCRLDistributionPoints(t *testing.T) {
 	checker := NewChecker(http.DefaultClient, time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
 
-	if info.OverallStatus != StatusUnknown {
-		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
+	if info.OverallStatus != StatusNotSupported {
+		t.Errorf("expected overall status %q, got %q", StatusNotSupported, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != StatusNotChecked {
-		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
+	if info.Results[0].Status != StatusNotSupported {
+		t.Errorf("expected result status %q, got %q", StatusNotSupported, info.Results[0].Status)
 	}
 }
 
@@ -345,6 +345,11 @@ func TestComputeOverallStatus(t *testing.T) {
 			name:     "single not_checked",
 			results:  []Result{{Status: StatusNotChecked}},
 			expected: StatusUnknown,
+		},
+		{
+			name:     "single not_supported",
+			results:  []Result{{Status: StatusNotSupported}},
+			expected: StatusNotSupported,
 		},
 		{
 			name: "revoked takes precedence over good",
@@ -455,14 +460,14 @@ func TestCheckOCSP_NoOCSPServer(t *testing.T) {
 	checker := NewChecker(http.DefaultClient, time.Now)
 	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
 
-	if info.OverallStatus != StatusUnknown {
-		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
+	if info.OverallStatus != StatusNotSupported {
+		t.Errorf("expected overall status %q, got %q", StatusNotSupported, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
 	}
-	if info.Results[0].Status != StatusNotChecked {
-		t.Errorf("expected result status %q, got %q", StatusNotChecked, info.Results[0].Status)
+	if info.Results[0].Status != StatusNotSupported {
+		t.Errorf("expected result status %q, got %q", StatusNotSupported, info.Results[0].Status)
 	}
 }
 

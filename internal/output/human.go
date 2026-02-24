@@ -126,6 +126,8 @@ func formatRevocationLabel(status, method string) string {
 		return color.YellowString("unknown") + suffix
 	case "not_checked":
 		return "not checked"
+	case "not_supported":
+		return color.YellowString("not supported") + suffix
 	case "error":
 		return color.RedString("error") + suffix
 	default:

@@ -515,7 +515,7 @@ Both `client` and `pem` subcommands support certificate revocation checking via 
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--revocation` | `off` | Revocation check mode: `off`, `crl`, or `ocsp` |
+| `--revocation` | | Revocation check mode: `crl` or `ocsp` (disabled if not set) |
 | `--revocation-timeout` | `5s` | Timeout for revocation requests |
 | `--revocation-soft-fail` | `true` | Treat unreachable revocation endpoints as non-fatal |
 

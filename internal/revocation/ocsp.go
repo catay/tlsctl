@@ -24,7 +24,7 @@ func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options, now ti
 	if len(leaf.OCSPServer) == 0 {
 		return []Result{{
 			Method: MethodOCSP,
-			Status: StatusNotChecked,
+			Status: StatusNotSupported,
 			Error:  "no OCSP responder URL in certificate",
 		}}
 	}

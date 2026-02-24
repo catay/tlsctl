@@ -420,6 +420,16 @@ tlsctl pem cert.pem
 # Parse a certificate chain (multiple certs in one file)
 tlsctl pem chain.pem
 
+# Read PEM data from stdin (use '-' or omit the file argument)
+cat cert.pem | tlsctl pem -
+cat chain.pem | tlsctl pem
+
+# Fetch a certificate via openssl and inspect it
+echo | openssl s_client -connect github.com:443 2>/dev/null | openssl x509 | tlsctl pem -
+
+# Inspect a certificate fetched via curl
+curl -s https://example.com/ca.pem | tlsctl pem -
+
 # Verbose output
 tlsctl pem -o text cert.pem
 

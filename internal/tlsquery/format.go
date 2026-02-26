@@ -1,6 +1,9 @@
 package tlsquery
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
@@ -35,6 +38,7 @@ func CertInfoFromCert(cert *x509.Certificate) CertInfo {
 		NotBefore:          cert.NotBefore.UTC().Format(time.RFC3339),
 		NotAfter:           cert.NotAfter.UTC().Format(time.RFC3339),
 		PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
+		KeyLength:          publicKeyLength(cert),
 		KeyUsage:           formatKeyUsage(cert.KeyUsage),
 		ExtKeyUsage:        formatExtKeyUsage(cert.ExtKeyUsage),
 		SubjectKeyID:       formatKeyID(cert.SubjectKeyId),
@@ -57,6 +61,19 @@ func CertInfoFromCert(cert *x509.Certificate) CertInfo {
 	}
 
 	return info
+}
+
+func publicKeyLength(cert *x509.Certificate) int {
+	switch key := cert.PublicKey.(type) {
+	case *rsa.PublicKey:
+		return key.N.BitLen()
+	case *ecdsa.PublicKey:
+		return key.Curve.Params().BitSize
+	case ed25519.PublicKey:
+		return len(key) * 8
+	default:
+		return 0
+	}
 }
 
 func formatSerialNumber(b []byte) string {

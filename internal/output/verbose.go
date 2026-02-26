@@ -47,6 +47,9 @@ func renderCertFields(w io.Writer, cert *tlsquery.CertInfo) {
 	fmt.Fprintf(w, "Not Before:            %s\n", cert.NotBefore)
 	fmt.Fprintf(w, "Not After:             %s\n", cert.NotAfter)
 	fmt.Fprintf(w, "Public Key Algorithm:  %s\n", cert.PublicKeyAlgorithm)
+	if cert.KeyLength > 0 {
+		fmt.Fprintf(w, "Key Length:            %d bits\n", cert.KeyLength)
+	}
 	if len(cert.KeyUsage) > 0 {
 		fmt.Fprintf(w, "Key Usage:             %s\n", strings.Join(cert.KeyUsage, ", "))
 	}

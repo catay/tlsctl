@@ -16,6 +16,7 @@ type CertInfo struct {
 	NotBefore          string            `json:"not_before" yaml:"not_before"`
 	NotAfter           string            `json:"not_after" yaml:"not_after"`
 	PublicKeyAlgorithm string            `json:"public_key_algorithm" yaml:"public_key_algorithm"`
+	KeyLength          int               `json:"key_length" yaml:"key_length"`
 	KeyUsage           []string          `json:"key_usage,omitempty" yaml:"key_usage,omitempty"`
 	ExtKeyUsage        []string          `json:"extended_key_usage,omitempty" yaml:"extended_key_usage,omitempty"`
 	BasicConstraints   *BasicConstraints `json:"basic_constraints,omitempty" yaml:"basic_constraints,omitempty"`

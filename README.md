@@ -241,6 +241,7 @@ Subject:               CN=*.badssl.com
 Not Before:            2026-01-20T20:02:51Z
 Not After:             2026-04-20T20:02:50Z
 Public Key Algorithm:  RSA
+Key Length:            2048 bits
 Key Usage:             Digital Signature, Key Encipherment
 Extended Key Usage:    TLS Web Server Authentication, TLS Web Client Authentication
 Basic Constraints:     CA:FALSE
@@ -259,6 +260,7 @@ Subject:               CN=R13,O=Let's Encrypt,C=US
 Not Before:            2024-03-13T00:00:00Z
 Not After:             2027-03-12T23:59:59Z
 Public Key Algorithm:  RSA
+Key Length:            2048 bits
 Key Usage:             Digital Signature, Certificate Sign, CRL Sign
 Extended Key Usage:    TLS Web Client Authentication, TLS Web Server Authentication
 Basic Constraints:     CA:TRUE, pathlen:0
@@ -290,6 +292,7 @@ $ tlsctl client -o json badssl.com
       "not_before": "2026-01-20T20:02:51Z",
       "not_after": "2026-04-20T20:02:50Z",
       "public_key_algorithm": "RSA",
+      "key_length": 2048,
       "key_usage": ["Digital Signature", "Key Encipherment"],
       "extended_key_usage": ["TLS Web Server Authentication", "TLS Web Client Authentication"],
       "subject_alternative_names": ["*.badssl.com", "badssl.com"],
@@ -323,6 +326,7 @@ certificates:
     not_before: "2026-01-20T20:02:51Z"
     not_after: "2026-04-20T20:02:50Z"
     public_key_algorithm: RSA
+    key_length: 2048
     key_usage:
       - Digital Signature
       - Key Encipherment
@@ -553,6 +557,7 @@ The tool extracts and displays the following X.509 certificate fields:
 | Issuer / Subject | Distinguished name (DN) |
 | Validity | Not Before / Not After in RFC 3339 format |
 | Public Key Algorithm | e.g., RSA, ECDSA |
+| Key Length | Public key size in bits (e.g., 2048, 4096, 256) |
 | Key Usage | Digital Signature, Key Encipherment, Certificate Sign, etc. |
 | Extended Key Usage | TLS Web Server Authentication, Client Authentication, etc. |
 | Basic Constraints | CA flag and path length |

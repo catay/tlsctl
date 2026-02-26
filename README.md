@@ -112,7 +112,7 @@ tlsctl client example.com
 # Inspect multiple endpoints from a file (one per line)
 tlsctl client --file hosts.txt
 
-# Probe supported TLS versions
+# Probe supported TLS versions and cipher suites
 tlsctl client --tls-versions example.com
 
 # Use a custom port
@@ -225,6 +225,33 @@ $ tlsctl client --revocation ocsp google.com
 
   Chain: *.google.com → WR2 → GTS Root R1 (3 certificates)
 ```
+
+### Probing TLS versions and cipher suites
+
+Use `--tls-versions` to probe supported TLS versions and enumerate server-side cipher suites in preferred order:
+
+```
+$ tlsctl client --tls-versions badssl.com
+*.badssl.com (secure, expires in 66 days) ✓
+  Subject:  CN=*.badssl.com
+  Issuer:   CN=R13,O=Let's Encrypt,C=US
+  Validity: 2026-01-20 → 2026-04-20
+  SANs:     *.badssl.com, badssl.com
+  TLS:      TLS 1.2, TLS 1.3
+  Ciphers (TLS 1.2):
+    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+  Ciphers (TLS 1.3):
+    TLS_AES_256_GCM_SHA384
+
+  Chain: *.badssl.com → R13 (2 certificates)
+```
+
+For TLS 1.0–1.2, cipher suites are enumerated by performing repeated handshakes to
+determine the server's full preference order. For TLS 1.3, only the negotiated cipher
+suite is reported because Go's `crypto/tls` does not allow configuring TLS 1.3 cipher
+suites individually.
 
 ### Verbose text output
 

@@ -22,7 +22,20 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 		fmt.Fprintf(w, "%s Certificate verification failed: %s\n\n", color.YellowString("⚠"), reason)
 	}
 	if len(chain.TLSVersions) > 0 {
-		fmt.Fprintf(w, "TLS Versions:          %s\n\n", strings.Join(chain.TLSVersions, ", "))
+		versions := make([]string, len(chain.TLSVersions))
+		for i, v := range chain.TLSVersions {
+			versions[i] = v.Version
+		}
+		fmt.Fprintf(w, "TLS Versions:          %s\n", strings.Join(versions, ", "))
+		for _, v := range chain.TLSVersions {
+			if len(v.CipherSuites) > 0 {
+				fmt.Fprintf(w, "Cipher Suites (%s):\n", v.Version)
+				for _, cs := range v.CipherSuites {
+					fmt.Fprintf(w, "  %s\n", cs)
+				}
+			}
+		}
+		fmt.Fprintln(w)
 	}
 
 	for i, cert := range chain.Certificates {

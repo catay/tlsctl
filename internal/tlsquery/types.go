@@ -45,12 +45,18 @@ type BasicConstraints struct {
 	MaxPathLen int  `json:"max_path_len,omitempty" yaml:"max_path_len,omitempty"`
 }
 
+// TLSVersionInfo holds a TLS version and its supported cipher suites in server-preferred order.
+type TLSVersionInfo struct {
+	Version      string   `json:"version" yaml:"version"`
+	CipherSuites []string `json:"cipher_suites" yaml:"cipher_suites"`
+}
+
 // ChainInfo holds the full certificate chain.
 type ChainInfo struct {
-	Certificates      []CertInfo `json:"certificates" yaml:"certificates"`
-	Verified          bool       `json:"verified" yaml:"verified"`
-	VerificationError string     `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
-	TLSVersions       []string   `json:"tls_versions,omitempty" yaml:"tls_versions,omitempty"`
+	Certificates      []CertInfo       `json:"certificates" yaml:"certificates"`
+	Verified          bool             `json:"verified" yaml:"verified"`
+	VerificationError string           `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
+	TLSVersions       []TLSVersionInfo `json:"tls_versions,omitempty" yaml:"tls_versions,omitempty"`
 }
 
 // QueryOptions configures the TLS query behavior.

@@ -85,7 +85,19 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	}
 
 	if len(chain.TLSVersions) > 0 {
-		fmt.Fprintf(w, "  TLS:      %s\n", strings.Join(chain.TLSVersions, ", "))
+		versions := make([]string, len(chain.TLSVersions))
+		for i, v := range chain.TLSVersions {
+			versions[i] = v.Version
+		}
+		fmt.Fprintf(w, "  TLS:      %s\n", strings.Join(versions, ", "))
+		for _, v := range chain.TLSVersions {
+			if len(v.CipherSuites) > 0 {
+				fmt.Fprintf(w, "  Ciphers (%s):\n", v.Version)
+				for _, cs := range v.CipherSuites {
+					fmt.Fprintf(w, "    %s\n", cs)
+				}
+			}
+		}
 	}
 
 	if len(chain.Certificates) > 1 {

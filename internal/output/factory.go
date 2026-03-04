@@ -6,6 +6,7 @@ type Format string
 
 const (
 	FormatDefault Format = ""
+	FormatHuman   Format = "human"
 	FormatJSON    Format = "json"
 	FormatYAML    Format = "yaml"
 	FormatText    Format = "text"
@@ -14,7 +15,7 @@ const (
 
 func New(format Format) (Renderer, error) {
 	switch format {
-	case FormatDefault:
+	case FormatDefault, FormatHuman:
 		return HumanRenderer{}, nil
 	case FormatJSON:
 		return JSONRenderer{}, nil
@@ -25,6 +26,6 @@ func New(format Format) (Renderer, error) {
 	case FormatRaw:
 		return RawPEMRenderer{}, nil
 	default:
-		return nil, fmt.Errorf("invalid output format: %q (valid: json, yaml, text, raw)", format)
+		return nil, fmt.Errorf("invalid output format: %q (valid: human, json, yaml, text, raw)", format)
 	}
 }

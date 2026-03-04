@@ -137,7 +137,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")

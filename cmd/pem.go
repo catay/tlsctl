@@ -72,7 +72,7 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: json, yaml, text (verbose), raw (PEM)")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	addRevocationFlags(cmd, &rf)
 	addCertFlags(cmd)

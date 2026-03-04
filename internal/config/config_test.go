@@ -1,0 +1,292 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestDefaultPath(t *testing.T) {
+	p, err := DefaultPath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p == "" {
+		t.Fatal("expected non-empty path")
+	}
+	if filepath.Base(p) != "settings.json" {
+		t.Errorf("expected settings.json, got %s", filepath.Base(p))
+	}
+}
+
+func TestLoad_MissingDefault(t *testing.T) {
+	s, err := Load("/nonexistent/settings.json", false)
+	if err != nil {
+		t.Fatalf("unexpected error for missing default config: %v", err)
+	}
+	if s == nil {
+		t.Fatal("expected non-nil settings")
+	}
+}
+
+func TestLoad_MissingExplicit(t *testing.T) {
+	_, err := Load("/nonexistent/settings.json", true)
+	if err == nil {
+		t.Fatal("expected error for missing explicit config")
+	}
+}
+
+func TestLoad_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{invalid`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestLoad_UnknownKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"unknown_key": true}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for unknown key")
+	}
+}
+
+func TestLoad_InvalidExpiryWarning(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+
+	tests := []struct {
+		name string
+		json string
+	}{
+		{"too low", `{"client": {"expiry-warning": 0}}`},
+		{"too high", `{"pem": {"expiry-warning": 10001}}`},
+		{"negative", `{"client": {"expiry-warning": -5}}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := os.WriteFile(path, []byte(tt.json), 0644); err != nil {
+				t.Fatalf("failed to write file: %v", err)
+			}
+			_, err := Load(path, false)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestLoad_InvalidRevocation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"client": {"revocation": "invalid"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid revocation mode")
+	}
+}
+
+func TestLoad_InvalidStartTLS(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"client": {"starttls": "ftp"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid starttls")
+	}
+}
+
+func TestLoad_ValidConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{
+		"global": {"no-color": true, "quiet": false},
+		"client": {
+			"expiry-warning": 21,
+			"output": "json",
+			"proxy": "http://proxy:8080",
+			"tls-versions": true,
+			"revocation": "ocsp",
+			"revocation-timeout": "10s",
+			"revocation-soft-fail": false,
+			"insecure": false,
+			"servername": "example.com",
+			"starttls": "smtp",
+			"cacert": "/etc/ssl/ca.pem",
+			"file": "hosts.txt"
+		},
+		"pem": {
+			"expiry-warning": 7,
+			"output": "yaml",
+			"cacert": "/etc/ssl/ca.pem",
+			"revocation": "crl",
+			"revocation-timeout": "3s",
+			"revocation-soft-fail": true
+		}
+	}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	s, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Global
+	if s.Global.NoColor == nil || !*s.Global.NoColor {
+		t.Error("expected global.no-color = true")
+	}
+	if s.Global.Quiet == nil || *s.Global.Quiet {
+		t.Error("expected global.quiet = false")
+	}
+
+	// Client
+	if s.Client.ExpiryWarning == nil || *s.Client.ExpiryWarning != 21 {
+		t.Error("expected client.expiry-warning = 21")
+	}
+	if s.Client.Output == nil || *s.Client.Output != "json" {
+		t.Error("expected client.output = json")
+	}
+	if s.Client.Proxy == nil || *s.Client.Proxy != "http://proxy:8080" {
+		t.Error("expected client.proxy")
+	}
+	if s.Client.TLSVersions == nil || !*s.Client.TLSVersions {
+		t.Error("expected client.tls-versions = true")
+	}
+	if s.Client.RevocationTimeout == nil || s.Client.RevocationTimeout.Duration != 10*time.Second {
+		t.Error("expected client.revocation-timeout = 10s")
+	}
+	if s.Client.RevocationSoftFail == nil || *s.Client.RevocationSoftFail {
+		t.Error("expected client.revocation-soft-fail = false")
+	}
+
+	// Pem
+	if s.Pem.ExpiryWarning == nil || *s.Pem.ExpiryWarning != 7 {
+		t.Error("expected pem.expiry-warning = 7")
+	}
+	if s.Pem.Output == nil || *s.Pem.Output != "yaml" {
+		t.Error("expected pem.output = yaml")
+	}
+}
+
+func TestFlagValues_Client(t *testing.T) {
+	expiry := 21
+	output := "json"
+	s := &Settings{
+		Client: ClientSettings{
+			ExpiryWarning: &expiry,
+			Output:        &output,
+		},
+	}
+
+	vals := s.FlagValues("client")
+	if vals["expiry-warning"] != "21" {
+		t.Errorf("expected expiry-warning=21, got %s", vals["expiry-warning"])
+	}
+	if vals["output"] != "json" {
+		t.Errorf("expected output=json, got %s", vals["output"])
+	}
+}
+
+func TestFlagValues_Pem(t *testing.T) {
+	noColor := true
+	expiry := 7
+	s := &Settings{
+		Global: GlobalSettings{NoColor: &noColor},
+		Pem: PemSettings{
+			ExpiryWarning: &expiry,
+		},
+	}
+
+	vals := s.FlagValues("pem")
+	if vals["no-color"] != "true" {
+		t.Errorf("expected no-color=true, got %s", vals["no-color"])
+	}
+	if vals["expiry-warning"] != "7" {
+		t.Errorf("expected expiry-warning=7, got %s", vals["expiry-warning"])
+	}
+}
+
+func TestFlagValues_UnknownSubcommand(t *testing.T) {
+	noColor := true
+	s := &Settings{
+		Global: GlobalSettings{NoColor: &noColor},
+	}
+
+	vals := s.FlagValues("unknown")
+	if vals["no-color"] != "true" {
+		t.Errorf("global settings should still apply for unknown subcommand")
+	}
+	if len(vals) != 1 {
+		t.Errorf("expected only global flags, got %d entries", len(vals))
+	}
+}
+
+func TestLoad_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	s, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	vals := s.FlagValues("client")
+	if len(vals) != 0 {
+		t.Errorf("expected no flag values from empty config, got %d", len(vals))
+	}
+}
+
+func TestDuration_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    time.Duration
+		wantErr bool
+	}{
+		{"valid seconds", `"5s"`, 5 * time.Second, false},
+		{"valid minutes", `"2m"`, 2 * time.Minute, false},
+		{"invalid", `"bad"`, 0, true},
+		{"not string", `123`, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d Duration
+			err := d.UnmarshalJSON([]byte(tt.input))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if d.Duration != tt.want {
+				t.Errorf("got %v, want %v", d.Duration, tt.want)
+			}
+		})
+	}
+}

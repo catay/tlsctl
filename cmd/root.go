@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/catay/tlsctl/internal/config"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,7 @@ const (
 var defaultRuntime = NewRuntime()
 
 var rootCmd = newRootCmd(defaultRuntime)
+var configPath string
 var noColor bool
 var quiet bool
 var expiryWarningDays int
@@ -34,13 +36,49 @@ func validateCertFlags() error {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "Path to configuration file (default: OS-specific config dir)")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if err := loadAndApplyConfig(cmd); err != nil {
+			return err
+		}
 		if noColor {
 			color.NoColor = true
 		}
 		return nil
 	}
+}
+
+func loadAndApplyConfig(cmd *cobra.Command) error {
+	path := configPath
+	explicit := path != ""
+	if !explicit {
+		var err error
+		path, err = config.DefaultPath()
+		if err != nil {
+			return err
+		}
+	}
+
+	settings, err := config.Load(path, explicit)
+	if err != nil {
+		return err
+	}
+
+	subcmd := cmd.Name()
+	vals := settings.FlagValues(subcmd)
+	for name, value := range vals {
+		f := cmd.Flag(name)
+		if f == nil {
+			continue
+		}
+		if !f.Changed {
+			if err := f.Value.Set(value); err != nil {
+				return fmt.Errorf("config: invalid value for %s: %w", name, err)
+			}
+		}
+	}
+	return nil
 }
 
 func Execute() {

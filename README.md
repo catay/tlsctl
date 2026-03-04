@@ -25,6 +25,7 @@
 - [Status indicators](#status-indicators)
 - [Quiet mode](#quiet-mode)
 - [Disabling color](#disabling-color)
+- [Configuration file](#configuration-file)
 - [Revocation checking](#revocation-checking)
 - [Certificate fields](#certificate-fields)
 - [Testing with badssl.com](#testing-with-badsslcom)
@@ -549,6 +550,61 @@ Use `--no-color` to strip ANSI color codes from output, useful for piping to oth
 tlsctl client --no-color example.com
 tlsctl client --no-color example.com | tee cert.log
 ```
+
+## Configuration file
+
+`tlsctl` supports a `settings.json` configuration file for defining default values per subcommand. Configuration values are applied in the following order of precedence:
+
+1. **CLI arguments** (highest priority)
+2. **Values from `settings.json`**
+3. **Built-in defaults** (lowest priority)
+
+### File location
+
+The configuration file is stored in the OS-specific configuration directory:
+
+| Platform | Path |
+|----------|------|
+| Linux    | `$XDG_CONFIG_HOME/tlsctl/settings.json` or `~/.config/tlsctl/settings.json` |
+| macOS    | `~/Library/Application Support/tlsctl/settings.json` |
+| Windows  | `%AppData%\tlsctl\settings.json` |
+
+Use `--config <path>` to override the default location:
+
+```bash
+tlsctl --config /path/to/settings.json client example.com
+```
+
+If the default configuration file is missing, `tlsctl` runs with built-in defaults. If `--config` points to a missing file, an error is reported.
+
+### Example configuration
+
+```json
+{
+  "global": {
+    "no-color": false,
+    "quiet": false
+  },
+  "client": {
+    "expiry-warning": 21,
+    "output": "json",
+    "proxy": "http://proxy:8080",
+    "tls-versions": true,
+    "revocation": "ocsp",
+    "revocation-timeout": "10s",
+    "revocation-soft-fail": false
+  },
+  "pem": {
+    "expiry-warning": 7,
+    "output": "yaml",
+    "cacert": "/etc/ssl/certs/ca.pem"
+  }
+}
+```
+
+The `global` section applies to all subcommands. Each subcommand section (`client`, `pem`) supports the same keys as the corresponding CLI flags. Only set the values you want to override — omitted keys use built-in defaults.
+
+Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
 
 ## Revocation checking
 

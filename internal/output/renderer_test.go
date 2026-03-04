@@ -43,6 +43,7 @@ func TestNewFactory(t *testing.T) {
 		wantError bool
 	}{
 		{FormatDefault, "HumanRenderer", false},
+		{FormatHuman, "HumanRenderer", false},
 		{FormatJSON, "JSONRenderer", false},
 		{FormatYAML, "YAMLRenderer", false},
 		{FormatText, "VerboseTextRenderer", false},

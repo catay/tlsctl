@@ -509,7 +509,7 @@ tlsctl client -o json google.com github.com | jq -r '.[] | .certificates[] | sel
 
 | Format | Flag | Description |
 |--------|------|-------------|
-| Default | *(none)* | Brief human-readable summary with color-coded status |
+| Human | *(default)* or `-o human` | Brief human-readable summary with color-coded status |
 | Text | `-o text` | Verbose output with all certificate fields |
 | JSON | `-o json` | Full structured JSON, ideal for scripting and automation |
 | YAML | `-o yaml` | Full structured YAML |

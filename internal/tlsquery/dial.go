@@ -14,9 +14,8 @@ const (
 	probeDialTimeout   = 5 * time.Second
 )
 
-func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLS ...string) ([]*x509.Certificate, error) {
-	proto := startTLSProtocol(startTLS)
-	conn, err := dialTLS(endpoint, proxyURL, config, defaultDialTimeout, proto)
+func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLSProto string) ([]*x509.Certificate, error) {
+	conn, err := dialTLS(endpoint, proxyURL, config, defaultDialTimeout, startTLSProto)
 	if err != nil {
 		return nil, err
 	}
@@ -50,15 +49,13 @@ func tlsVersionName(v uint16) string {
 // probeTLSVersions tests which TLS versions the server supports by attempting
 // a handshake with each version individually, and enumerates the supported
 // cipher suites in server-preferred order for each version.
-func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, insecure bool, startTLSProto ...string) []TLSVersionInfo {
+func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, insecure bool, startTLSProto string) []TLSVersionInfo {
 	versions := []uint16{
 		tls.VersionTLS10,
 		tls.VersionTLS11,
 		tls.VersionTLS12,
 		tls.VersionTLS13,
 	}
-
-	proto := startTLSProtocol(startTLSProto)
 
 	var supported []TLSVersionInfo
 	for _, v := range versions {
@@ -67,13 +64,13 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		cfg.MaxVersion = v
 		cfg.InsecureSkipVerify = insecure
 
-		conn, err := dialTLS(endpoint, proxyURL, cfg, probeDialTimeout, proto)
+		conn, err := dialTLS(endpoint, proxyURL, cfg, probeDialTimeout, startTLSProto)
 		if err != nil {
 			continue
 		}
 		conn.Close()
 
-		ciphers := probeCipherSuites(endpoint, proxyURL, baseConfig, v, insecure, proto)
+		ciphers := probeCipherSuites(endpoint, proxyURL, baseConfig, v, insecure, startTLSProto)
 		supported = append(supported, TLSVersionInfo{
 			Version:      tlsVersionName(v),
 			CipherSuites: ciphers,
@@ -187,11 +184,4 @@ func dialTCP(endpoint string, proxyURL *url.URL, timeout time.Duration) (net.Con
 		return dialViaProxy(endpoint, proxyURL, timeout)
 	}
 	return (&net.Dialer{Timeout: timeout}).Dial("tcp", endpoint)
-}
-
-func startTLSProtocol(protocols []string) string {
-	if len(protocols) > 0 {
-		return protocols[0]
-	}
-	return ""
 }

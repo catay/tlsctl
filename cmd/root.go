@@ -16,7 +16,7 @@ const (
 
 var defaultRuntime = NewRuntime()
 
-var rootCmd = newRootCmd(defaultRuntime)
+var rootCmd = newRootCmd()
 var configPath string
 var noColor bool
 var quiet bool
@@ -90,8 +90,7 @@ func Execute() {
 	}
 }
 
-func newRootCmd(rt *Runtime) *cobra.Command {
-	_ = rt
+func newRootCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "tlsctl",
 		Short: "A CLI tool for TLS certificate operations",

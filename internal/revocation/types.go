@@ -2,7 +2,6 @@ package revocation
 
 import (
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -38,7 +37,6 @@ type Options struct {
 	Timeout  time.Duration
 	SoftFail bool
 	Now      func() time.Time
-	Proxy    *url.URL
 }
 
 type HTTPDoer interface {

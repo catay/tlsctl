@@ -28,24 +28,41 @@ func TestValidStartTLSProtocol(t *testing.T) {
 	}
 }
 
-func TestDefaultStartTLSPort(t *testing.T) {
+func TestStartTLSPort(t *testing.T) {
 	tests := []struct {
 		protocol string
 		want     string
+		wantOK   bool
 	}{
-		{"smtp", "587"},
-		{"imap", "143"},
-		{"pop3", "110"},
-		{"ldap", "389"},
-		{"unknown", ""},
+		{"smtp", "587", true},
+		{"imap", "143", true},
+		{"pop3", "110", true},
+		{"ldap", "389", true},
+		{"unknown", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.protocol, func(t *testing.T) {
-			if got := defaultStartTLSPort(tt.protocol); got != tt.want {
-				t.Errorf("defaultStartTLSPort(%q) = %q, want %q", tt.protocol, got, tt.want)
+			got, ok := StartTLSPort(tt.protocol)
+			if got != tt.want {
+				t.Errorf("StartTLSPort(%q) = %q, want %q", tt.protocol, got, tt.want)
+			}
+			if ok != tt.wantOK {
+				t.Errorf("StartTLSPort(%q) ok = %v, want %v", tt.protocol, ok, tt.wantOK)
 			}
 		})
+	}
+}
+
+func TestStartTLSProtocolsReturnsCopy(t *testing.T) {
+	protos := StartTLSProtocols()
+	if len(protos) == 0 {
+		t.Fatal("expected non-empty protocol list")
+	}
+
+	protos[0] = "modified"
+	if got := StartTLSProtocols()[0]; got == "modified" {
+		t.Fatal("expected StartTLSProtocols to return a copy")
 	}
 }
 

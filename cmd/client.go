@@ -25,11 +25,6 @@ type revocationFlags struct {
 	softFail bool
 }
 
-var validRevocationModes = map[string]bool{
-	"crl":  true,
-	"ocsp": true,
-}
-
 func addRevocationFlags(cmd *cobra.Command, rf *revocationFlags) {
 	cmd.Flags().StringVar(&rf.mode, "revocation", "", "Revocation check mode: crl, ocsp")
 	cmd.Flags().DurationVar(&rf.timeout, "revocation-timeout", 5*time.Second, "Timeout for revocation checks")
@@ -40,10 +35,12 @@ func validateRevocationMode(mode string) error {
 	if mode == "" {
 		return nil
 	}
-	if !validRevocationModes[mode] {
+	switch mode {
+	case "crl", "ocsp":
+		return nil
+	default:
 		return fmt.Errorf("invalid revocation mode %q: must be one of crl, ocsp", mode)
 	}
-	return nil
 }
 
 func newClientCmd(rt *Runtime) *cobra.Command {
@@ -79,7 +76,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			}
 
 			if startTLS != "" && !tlsquery.ValidStartTLSProtocol(startTLS) {
-				return fmt.Errorf("invalid --starttls protocol %q: must be one of smtp, imap, pop3, ldap", startTLS)
+				return fmt.Errorf("invalid --starttls protocol %q: must be one of %s", startTLS, tlsquery.StartTLSProtocolList())
 			}
 
 			targets, err := collectTargets(args, inputFile, startTLS)
@@ -143,7 +140,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
 	cmd.Flags().BoolVar(&tlsVersions, "tls-versions", false, "Probe and display supported TLS versions")
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
-	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: smtp, imap, pop3, ldap")
+	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: "+tlsquery.StartTLSProtocolList())
 	cmd.Flags().BoolVarP(&insecure, "insecure", "k", false, "Skip TLS certificate verification")
 	addRevocationFlags(cmd, &rf)
 	addCertFlags(cmd)
@@ -253,7 +250,7 @@ func queryTargets(targets []string, opts tlsquery.QueryOptions, revocationFn fun
 	return results
 }
 
-func collectTargets(args []string, inputFile string, startTLSProto ...string) ([]string, error) {
+func collectTargets(args []string, inputFile, startTLSProto string) ([]string, error) {
 	var targets []string
 	if inputFile != "" {
 		fileTargets, err := readTargetsFromFile(inputFile)
@@ -268,18 +265,13 @@ func collectTargets(args []string, inputFile string, startTLSProto ...string) ([
 		return nil, fmt.Errorf("no endpoints provided")
 	}
 
-	proto := ""
-	if len(startTLSProto) > 0 {
-		proto = startTLSProto[0]
-	}
-
 	normalized := make([]string, 0, len(targets))
 	for _, raw := range targets {
 		value := strings.TrimSpace(raw)
 		if value == "" {
 			continue
 		}
-		endpoint, err := cli.NormalizeEndpoint(value, proto)
+		endpoint, err := cli.NormalizeEndpoint(value, startTLSProto)
 		if err != nil {
 			return nil, fmt.Errorf("invalid endpoint %q: %w", value, err)
 		}

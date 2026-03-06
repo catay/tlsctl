@@ -64,7 +64,7 @@ example.org:8443 # inline comment
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := collectTargets(tt.args, tt.file)
+			got, err := collectTargets(tt.args, tt.file, "")
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")

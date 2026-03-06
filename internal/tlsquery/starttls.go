@@ -9,30 +9,35 @@ import (
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-// defaultStartTLSPort returns the standard plaintext port for a STARTTLS protocol.
-func defaultStartTLSPort(protocol string) string {
-	switch protocol {
-	case "smtp":
-		return "587"
-	case "imap":
-		return "143"
-	case "pop3":
-		return "110"
-	case "ldap":
-		return "389"
-	default:
-		return ""
-	}
+var startTLSProtocolPorts = map[string]string{
+	"smtp": "587",
+	"imap": "143",
+	"pop3": "110",
+	"ldap": "389",
+}
+
+var startTLSProtocols = []string{"smtp", "imap", "pop3", "ldap"}
+
+// StartTLSProtocols returns the supported STARTTLS protocol names.
+func StartTLSProtocols() []string {
+	return append([]string(nil), startTLSProtocols...)
+}
+
+// StartTLSProtocolList returns supported STARTTLS protocols in display order.
+func StartTLSProtocolList() string {
+	return strings.Join(startTLSProtocols, ", ")
+}
+
+// StartTLSPort returns the default plaintext port for a STARTTLS protocol.
+func StartTLSPort(protocol string) (string, bool) {
+	port, ok := startTLSProtocolPorts[protocol]
+	return port, ok
 }
 
 // ValidStartTLSProtocol returns true if the given protocol name is supported.
 func ValidStartTLSProtocol(protocol string) bool {
-	switch protocol {
-	case "smtp", "imap", "pop3", "ldap":
-		return true
-	default:
-		return false
-	}
+	_, ok := startTLSProtocolPorts[protocol]
+	return ok
 }
 
 // negotiateStartTLS performs the protocol-specific STARTTLS handshake on an

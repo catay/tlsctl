@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 const appName = "tlsctl"
@@ -153,12 +155,13 @@ func validateStartTLS(v *string) error {
 	if v == nil {
 		return nil
 	}
-	switch *v {
-	case "", "smtp", "imap", "pop3", "ldap":
+	if *v == "" {
 		return nil
-	default:
-		return fmt.Errorf("must be one of smtp, imap, pop3, ldap")
 	}
+	if tlsquery.ValidStartTLSProtocol(*v) {
+		return nil
+	}
+	return fmt.Errorf("must be one of %s", tlsquery.StartTLSProtocolList())
 }
 
 // FlagValues returns a map of flag-name to string-value for the given

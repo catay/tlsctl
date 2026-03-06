@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 // NormalizeEndpoint parses and normalizes a host or host:port endpoint.
@@ -34,15 +36,8 @@ func NormalizeEndpoint(endpoint string, startTLSProto ...string) (string, error)
 
 func defaultPort(startTLSProto ...string) string {
 	if len(startTLSProto) > 0 {
-		switch startTLSProto[0] {
-		case "smtp":
-			return "587"
-		case "imap":
-			return "143"
-		case "pop3":
-			return "110"
-		case "ldap":
-			return "389"
+		if port, ok := tlsquery.StartTLSPort(startTLSProto[0]); ok {
+			return port
 		}
 	}
 	return "443"

@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -34,6 +35,22 @@ func testChain() *tlsquery.ChainInfo {
 
 func fixedNow() time.Time {
 	return time.Date(2026, 2, 5, 12, 0, 0, 0, time.UTC)
+}
+
+func sampleCipherSuites(t *testing.T) (secure string, insecure string) {
+	t.Helper()
+
+	secureSuites := tls.CipherSuites()
+	if len(secureSuites) == 0 {
+		t.Fatal("expected at least one secure cipher suite")
+	}
+
+	insecureSuites := tls.InsecureCipherSuites()
+	if len(insecureSuites) == 0 {
+		t.Fatal("expected at least one insecure cipher suite")
+	}
+
+	return secureSuites[0].Name, insecureSuites[0].Name
 }
 
 func TestNewFactory(t *testing.T) {
@@ -73,6 +90,15 @@ func TestNewFactory(t *testing.T) {
 func TestJSONRenderer(t *testing.T) {
 	chain := testChain()
 	chain.Verified = true
+	secureCipher, insecureCipher := sampleCipherSuites(t)
+	chain.TLSVersions = []tlsquery.TLSVersionInfo{
+		{
+			Version:              "TLS 1.2",
+			CipherSuites:         []string{secureCipher, insecureCipher},
+			SecureCipherSuites:   []string{secureCipher},
+			InsecureCipherSuites: []string{insecureCipher},
+		},
+	}
 	var buf bytes.Buffer
 	r := JSONRenderer{}
 
@@ -92,11 +118,29 @@ func TestJSONRenderer(t *testing.T) {
 	if result.Certificates[0].PEM != "" {
 		t.Error("PEM should be stripped from JSON output")
 	}
+	if len(result.TLSVersions) != 1 {
+		t.Fatalf("expected 1 tls version entry, got %d", len(result.TLSVersions))
+	}
+	if len(result.TLSVersions[0].SecureCipherSuites) != 1 {
+		t.Errorf("expected secure cipher suites in JSON output")
+	}
+	if len(result.TLSVersions[0].InsecureCipherSuites) != 1 {
+		t.Errorf("expected insecure cipher suites in JSON output")
+	}
 }
 
 func TestYAMLRenderer(t *testing.T) {
 	chain := testChain()
 	chain.Verified = true
+	secureCipher, insecureCipher := sampleCipherSuites(t)
+	chain.TLSVersions = []tlsquery.TLSVersionInfo{
+		{
+			Version:              "TLS 1.2",
+			CipherSuites:         []string{secureCipher, insecureCipher},
+			SecureCipherSuites:   []string{secureCipher},
+			InsecureCipherSuites: []string{insecureCipher},
+		},
+	}
 	var buf bytes.Buffer
 	r := YAMLRenderer{}
 
@@ -115,6 +159,15 @@ func TestYAMLRenderer(t *testing.T) {
 	}
 	if result.Certificates[0].PEM != "" {
 		t.Error("PEM should be stripped from YAML output")
+	}
+	if len(result.TLSVersions) != 1 {
+		t.Fatalf("expected 1 tls version entry, got %d", len(result.TLSVersions))
+	}
+	if len(result.TLSVersions[0].SecureCipherSuites) != 1 {
+		t.Errorf("expected secure cipher suites in YAML output")
+	}
+	if len(result.TLSVersions[0].InsecureCipherSuites) != 1 {
+		t.Errorf("expected insecure cipher suites in YAML output")
 	}
 }
 
@@ -219,6 +272,38 @@ func TestHumanRendererInsecure(t *testing.T) {
 	}
 }
 
+func TestHumanRendererTLSCipherSecurity(t *testing.T) {
+	chain := testChain()
+	chain.Verified = true
+	secureCipher, insecureCipher := sampleCipherSuites(t)
+	chain.TLSVersions = []tlsquery.TLSVersionInfo{
+		{
+			Version:              "TLS 1.2",
+			CipherSuites:         []string{secureCipher, insecureCipher},
+			SecureCipherSuites:   []string{secureCipher},
+			InsecureCipherSuites: []string{insecureCipher},
+		},
+	}
+	var buf bytes.Buffer
+	r := HumanRenderer{}
+
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Ciphers (TLS 1.2)") {
+		t.Error("expected cipher section in output")
+	}
+	if !strings.Contains(output, secureCipher) {
+		t.Error("expected secure cipher in output")
+	}
+	if !strings.Contains(output, insecureCipher+" (insecure)") {
+		t.Error("expected insecure cipher marker in output")
+	}
+}
+
 func TestVerboseTextRenderer(t *testing.T) {
 	chain := testChain()
 	chain.Verified = true
@@ -257,5 +342,38 @@ func TestVerboseTextRendererInsecure(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "verification failed") {
 		t.Error("expected verification failed warning in output")
+	}
+}
+
+func TestVerboseTextRendererTLSCipherSecurity(t *testing.T) {
+	chain := testChain()
+	chain.Verified = true
+	secureCipher, insecureCipher := sampleCipherSuites(t)
+	chain.TLSVersions = []tlsquery.TLSVersionInfo{
+		{
+			Version:      "TLS 1.2",
+			CipherSuites: []string{secureCipher, insecureCipher},
+		},
+	}
+	var buf bytes.Buffer
+	r := VerboseTextRenderer{}
+
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Secure Cipher Suites (TLS 1.2)") {
+		t.Error("expected secure cipher section in output")
+	}
+	if !strings.Contains(output, "Insecure Cipher Suites (TLS 1.2)") {
+		t.Error("expected insecure cipher section in output")
+	}
+	if !strings.Contains(output, secureCipher) {
+		t.Error("expected secure cipher in output")
+	}
+	if !strings.Contains(output, insecureCipher) {
+		t.Error("expected insecure cipher in output")
 	}
 }

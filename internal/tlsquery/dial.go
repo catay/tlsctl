@@ -71,9 +71,12 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 		conn.Close()
 
 		ciphers := probeCipherSuites(endpoint, proxyURL, baseConfig, v, insecure, startTLSProto)
+		secureCiphers, insecureCiphers := SplitCipherSuitesBySecurity(ciphers)
 		supported = append(supported, TLSVersionInfo{
-			Version:      tlsVersionName(v),
-			CipherSuites: ciphers,
+			Version:              tlsVersionName(v),
+			CipherSuites:         ciphers,
+			SecureCipherSuites:   secureCiphers,
+			InsecureCipherSuites: insecureCiphers,
 		})
 	}
 

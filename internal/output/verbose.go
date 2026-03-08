@@ -28,9 +28,17 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 		}
 		fmt.Fprintf(w, "TLS Versions:          %s\n", strings.Join(versions, ", "))
 		for _, v := range chain.TLSVersions {
-			if len(v.CipherSuites) > 0 {
-				fmt.Fprintf(w, "Cipher Suites (%s):\n", v.Version)
-				for _, cs := range v.CipherSuites {
+			secureCipherSuites, insecureCipherSuites := cipherSuitesBySecurity(v)
+
+			if len(secureCipherSuites) > 0 {
+				fmt.Fprintf(w, "Secure Cipher Suites (%s):\n", v.Version)
+				for _, cs := range secureCipherSuites {
+					fmt.Fprintf(w, "  %s\n", cs)
+				}
+			}
+			if len(insecureCipherSuites) > 0 {
+				fmt.Fprintf(w, "Insecure Cipher Suites (%s):\n", v.Version)
+				for _, cs := range insecureCipherSuites {
 					fmt.Fprintf(w, "  %s\n", cs)
 				}
 			}

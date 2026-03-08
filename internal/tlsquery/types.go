@@ -47,8 +47,10 @@ type BasicConstraints struct {
 
 // TLSVersionInfo holds a TLS version and its supported cipher suites in server-preferred order.
 type TLSVersionInfo struct {
-	Version      string   `json:"version" yaml:"version"`
-	CipherSuites []string `json:"cipher_suites" yaml:"cipher_suites"`
+	Version              string   `json:"version" yaml:"version"`
+	CipherSuites         []string `json:"cipher_suites,omitempty" yaml:"cipher_suites,omitempty"`
+	SecureCipherSuites   []string `json:"secure_cipher_suites,omitempty" yaml:"secure_cipher_suites,omitempty"`
+	InsecureCipherSuites []string `json:"insecure_cipher_suites,omitempty" yaml:"insecure_cipher_suites,omitempty"`
 }
 
 // ChainInfo holds the full certificate chain.

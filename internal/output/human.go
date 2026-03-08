@@ -91,10 +91,23 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 		}
 		fmt.Fprintf(w, "  TLS:      %s\n", strings.Join(versions, ", "))
 		for _, v := range chain.TLSVersions {
-			if len(v.CipherSuites) > 0 {
+			secureCipherSuites, insecureCipherSuites := cipherSuitesBySecurity(v)
+			cipherSuites := v.CipherSuites
+			if len(cipherSuites) == 0 {
+				cipherSuites = append(cipherSuites, secureCipherSuites...)
+				cipherSuites = append(cipherSuites, insecureCipherSuites...)
+			}
+
+			if len(cipherSuites) > 0 {
+				insecureSet := cipherSuiteSet(insecureCipherSuites)
+
 				fmt.Fprintf(w, "  Ciphers (%s):\n", v.Version)
-				for _, cs := range v.CipherSuites {
-					fmt.Fprintf(w, "    %s\n", cs)
+				for _, cs := range cipherSuites {
+					if _, insecure := insecureSet[cs]; insecure {
+						fmt.Fprintf(w, "    %s\n", color.RedString(cs+" (insecure)"))
+						continue
+					}
+					fmt.Fprintf(w, "    %s\n", color.GreenString(cs))
 				}
 			}
 		}

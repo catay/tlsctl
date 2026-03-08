@@ -254,6 +254,10 @@ determine the server's full preference order. For TLS 1.3, only the negotiated c
 suite is reported because Go's `crypto/tls` does not allow configuring TLS 1.3 cipher
 suites individually.
 
+In human output, insecure cipher suites are highlighted in red and tagged with `(insecure)`.
+In non-human outputs (`json`, `yaml`, and `text`), cipher suites are split into
+`secure_cipher_suites` and `insecure_cipher_suites`.
+
 ### Verbose text output
 
 Use `-o text` for the full certificate details:
@@ -331,6 +335,17 @@ $ tlsctl client -o json badssl.com
     }
   ],
   "verified": true
+}
+```
+
+When `--tls-versions` is enabled, each `tls_versions` entry includes:
+
+```json
+{
+  "version": "TLS 1.2",
+  "cipher_suites": ["..."],
+  "secure_cipher_suites": ["..."],
+  "insecure_cipher_suites": ["..."]
 }
 ```
 

@@ -577,8 +577,9 @@ tlsctl client --no-color example.com | tee cert.log
 `tlsctl` supports a `settings.json` configuration file for defining default values per subcommand. Configuration values are applied in the following order of precedence:
 
 1. **CLI arguments** (highest priority)
-2. **Values from `settings.json`**
-3. **Built-in defaults** (lowest priority)
+2. **Subcommand-specific values from `settings.json`**
+3. **Global values from `settings.json`**
+4. **Built-in defaults** (lowest priority)
 
 ### File location
 
@@ -604,26 +605,29 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
 {
   "global": {
     "no-color": false,
-    "quiet": false
-  },
-  "client": {
-    "expiry-warning": 21,
+    "quiet": false,
+    "expiry-warning": 30,
     "output": "json",
-    "proxy": "http://proxy:8080",
-    "tls-versions": true,
+    "cacert": "/etc/ssl/certs/ca.pem",
     "revocation": "ocsp",
     "revocation-timeout": "10s",
+    "revocation-soft-fail": true
+  },
+  "client": {
+    "quiet": true,
+    "expiry-warning": 21,
+    "proxy": "http://proxy:8080",
+    "tls-versions": true,
     "revocation-soft-fail": false
   },
   "pem": {
     "expiry-warning": 7,
-    "output": "yaml",
-    "cacert": "/etc/ssl/certs/ca.pem"
+    "output": "yaml"
   }
 }
 ```
 
-The `global` section applies to all subcommands. Each subcommand section (`client`, `pem`) supports the same keys as the corresponding CLI flags. Only set the values you want to override — omitted keys use built-in defaults.
+The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
 
 Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
 

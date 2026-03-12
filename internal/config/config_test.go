@@ -257,6 +257,167 @@ func TestLoad_EmptyFile(t *testing.T) {
 	}
 }
 
+func TestFlagValues_GlobalOverriddenBySubcommand(t *testing.T) {
+	globalExpiry := 30
+	clientExpiry := 21
+	globalOutput := "yaml"
+	clientOutput := "json"
+	globalCACert := "/global/ca.pem"
+
+	s := &Settings{
+		Global: GlobalSettings{
+			ExpiryWarning: &globalExpiry,
+			Output:        &globalOutput,
+			CACert:        &globalCACert,
+		},
+		Client: ClientSettings{
+			ExpiryWarning: &clientExpiry,
+			Output:        &clientOutput,
+		},
+	}
+
+	vals := s.FlagValues("client")
+	if vals["expiry-warning"] != "21" {
+		t.Errorf("expected client override expiry-warning=21, got %s", vals["expiry-warning"])
+	}
+	if vals["output"] != "json" {
+		t.Errorf("expected client override output=json, got %s", vals["output"])
+	}
+	if vals["cacert"] != "/global/ca.pem" {
+		t.Errorf("expected global cacert, got %s", vals["cacert"])
+	}
+}
+
+func TestFlagValues_GlobalAppliedWhenSubcommandUnset(t *testing.T) {
+	globalExpiry := 30
+	globalOutput := "yaml"
+	globalRevocation := "ocsp"
+
+	s := &Settings{
+		Global: GlobalSettings{
+			ExpiryWarning: &globalExpiry,
+			Output:        &globalOutput,
+			Revocation:    &globalRevocation,
+		},
+	}
+
+	vals := s.FlagValues("pem")
+	if vals["expiry-warning"] != "30" {
+		t.Errorf("expected global expiry-warning=30, got %s", vals["expiry-warning"])
+	}
+	if vals["output"] != "yaml" {
+		t.Errorf("expected global output=yaml, got %s", vals["output"])
+	}
+	if vals["revocation"] != "ocsp" {
+		t.Errorf("expected global revocation=ocsp, got %s", vals["revocation"])
+	}
+}
+
+func TestFlagValues_SubcommandOverridesGlobalNoColorQuiet(t *testing.T) {
+	globalNoColor := true
+	globalQuiet := true
+	clientNoColor := false
+	pemQuiet := false
+
+	s := &Settings{
+		Global: GlobalSettings{
+			NoColor: &globalNoColor,
+			Quiet:   &globalQuiet,
+		},
+		Client: ClientSettings{
+			NoColor: &clientNoColor,
+		},
+		Pem: PemSettings{
+			Quiet: &pemQuiet,
+		},
+	}
+
+	clientVals := s.FlagValues("client")
+	if clientVals["no-color"] != "false" {
+		t.Errorf("expected client override no-color=false, got %s", clientVals["no-color"])
+	}
+	if clientVals["quiet"] != "true" {
+		t.Errorf("expected global quiet=true for client, got %s", clientVals["quiet"])
+	}
+
+	pemVals := s.FlagValues("pem")
+	if pemVals["no-color"] != "true" {
+		t.Errorf("expected global no-color=true for pem, got %s", pemVals["no-color"])
+	}
+	if pemVals["quiet"] != "false" {
+		t.Errorf("expected pem override quiet=false, got %s", pemVals["quiet"])
+	}
+}
+
+func TestLoad_InvalidGlobalExpiryWarning(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"global": {"expiry-warning": 0}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected validation error for global.expiry-warning")
+	}
+}
+
+func TestLoad_InvalidGlobalRevocation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"global": {"revocation": "invalid"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected validation error for global.revocation")
+	}
+}
+
+func TestLoad_ValidGlobalConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{
+		"global": {
+			"no-color": true,
+			"quiet": false,
+			"expiry-warning": 45,
+			"output": "json",
+			"cacert": "/etc/ssl/ca.pem",
+			"revocation": "crl",
+			"revocation-timeout": "8s",
+			"revocation-soft-fail": false
+		}
+	}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	s, err := Load(path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.Global.ExpiryWarning == nil || *s.Global.ExpiryWarning != 45 {
+		t.Error("expected global.expiry-warning = 45")
+	}
+	if s.Global.Output == nil || *s.Global.Output != "json" {
+		t.Error("expected global.output = json")
+	}
+	if s.Global.CACert == nil || *s.Global.CACert != "/etc/ssl/ca.pem" {
+		t.Error("expected global.cacert = /etc/ssl/ca.pem")
+	}
+	if s.Global.Revocation == nil || *s.Global.Revocation != "crl" {
+		t.Error("expected global.revocation = crl")
+	}
+	if s.Global.RevocationTimeout == nil || s.Global.RevocationTimeout.Duration != 8*time.Second {
+		t.Error("expected global.revocation-timeout = 8s")
+	}
+	if s.Global.RevocationSoftFail == nil || *s.Global.RevocationSoftFail {
+		t.Error("expected global.revocation-soft-fail = false")
+	}
+}
+
 func TestDuration_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name    string

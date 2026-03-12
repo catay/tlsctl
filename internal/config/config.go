@@ -38,12 +38,20 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 
 // GlobalSettings holds settings that apply to all subcommands.
 type GlobalSettings struct {
-	NoColor *bool `json:"no-color,omitempty"`
-	Quiet   *bool `json:"quiet,omitempty"`
+	NoColor            *bool     `json:"no-color,omitempty"`
+	Quiet              *bool     `json:"quiet,omitempty"`
+	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
+	Output             *string   `json:"output,omitempty"`
+	CACert             *string   `json:"cacert,omitempty"`
+	Revocation         *string   `json:"revocation,omitempty"`
+	RevocationTimeout  *Duration `json:"revocation-timeout,omitempty"`
+	RevocationSoftFail *bool     `json:"revocation-soft-fail,omitempty"`
 }
 
 // ClientSettings holds settings for the client subcommand.
 type ClientSettings struct {
+	NoColor            *bool     `json:"no-color,omitempty"`
+	Quiet              *bool     `json:"quiet,omitempty"`
 	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
 	Output             *string   `json:"output,omitempty"`
 	CACert             *string   `json:"cacert,omitempty"`
@@ -59,6 +67,8 @@ type ClientSettings struct {
 
 // PemSettings holds settings for the pem subcommand.
 type PemSettings struct {
+	NoColor            *bool     `json:"no-color,omitempty"`
+	Quiet              *bool     `json:"quiet,omitempty"`
 	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
 	Output             *string   `json:"output,omitempty"`
 	CACert             *string   `json:"cacert,omitempty"`
@@ -110,6 +120,12 @@ func Load(path string, explicit bool) (*Settings, error) {
 }
 
 func (s *Settings) validate() error {
+	if err := validateExpiryWarning(s.Global.ExpiryWarning); err != nil {
+		return fmt.Errorf("global.expiry-warning: %w", err)
+	}
+	if err := validateRevocationMode(s.Global.Revocation); err != nil {
+		return fmt.Errorf("global.revocation: %w", err)
+	}
 	if err := validateExpiryWarning(s.Client.ExpiryWarning); err != nil {
 		return fmt.Errorf("client.expiry-warning: %w", err)
 	}
@@ -175,6 +191,24 @@ func (s *Settings) FlagValues(subcommand string) map[string]string {
 	if s.Global.Quiet != nil {
 		vals["quiet"] = boolStr(*s.Global.Quiet)
 	}
+	if s.Global.ExpiryWarning != nil {
+		vals["expiry-warning"] = fmt.Sprintf("%d", *s.Global.ExpiryWarning)
+	}
+	if s.Global.Output != nil {
+		vals["output"] = *s.Global.Output
+	}
+	if s.Global.CACert != nil {
+		vals["cacert"] = *s.Global.CACert
+	}
+	if s.Global.Revocation != nil {
+		vals["revocation"] = *s.Global.Revocation
+	}
+	if s.Global.RevocationTimeout != nil {
+		vals["revocation-timeout"] = s.Global.RevocationTimeout.String()
+	}
+	if s.Global.RevocationSoftFail != nil {
+		vals["revocation-soft-fail"] = boolStr(*s.Global.RevocationSoftFail)
+	}
 
 	// Apply subcommand-specific settings (overrides global if same key).
 	switch subcommand {
@@ -188,6 +222,12 @@ func (s *Settings) FlagValues(subcommand string) map[string]string {
 }
 
 func addClientFlags(vals map[string]string, c *ClientSettings) {
+	if c.NoColor != nil {
+		vals["no-color"] = boolStr(*c.NoColor)
+	}
+	if c.Quiet != nil {
+		vals["quiet"] = boolStr(*c.Quiet)
+	}
 	if c.ExpiryWarning != nil {
 		vals["expiry-warning"] = fmt.Sprintf("%d", *c.ExpiryWarning)
 	}
@@ -224,6 +264,12 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 }
 
 func addPemFlags(vals map[string]string, p *PemSettings) {
+	if p.NoColor != nil {
+		vals["no-color"] = boolStr(*p.NoColor)
+	}
+	if p.Quiet != nil {
+		vals["quiet"] = boolStr(*p.Quiet)
+	}
 	if p.ExpiryWarning != nil {
 		vals["expiry-warning"] = fmt.Sprintf("%d", *p.ExpiryWarning)
 	}

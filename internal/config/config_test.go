@@ -128,7 +128,6 @@ func TestLoad_ValidConfig(t *testing.T) {
 			"revocation": "ocsp",
 			"revocation-timeout": "10s",
 			"revocation-soft-fail": false,
-			"insecure": false,
 			"servername": "example.com",
 			"starttls": "smtp",
 			"cacert": "/etc/ssl/ca.pem",

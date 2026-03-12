@@ -1,6 +1,7 @@
 package tlsquery
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -30,25 +31,27 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
 
-	if opts.Insecure {
+	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS)
+	if err != nil {
+		if !isVerificationError(err) {
+			return nil, fmt.Errorf("TLS handshake failed: %w", err)
+		}
+		verifyErr := err
+
 		insecureConfig := config.Clone()
 		insecureConfig.InsecureSkipVerify = true
-		certs, err := dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS)
+		certs, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS)
 		if err != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
 		}
+
 		chain := buildChain(certs)
 		chain.Verified = false
-		chain.VerificationError = "verification skipped (--insecure)"
+		chain.VerificationError = abbreviateVerifyErrorWithChain(verifyErr, certs)
 		if probeVersions {
 			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS)
 		}
 		return chain, nil
-	}
-
-	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS)
-	if err != nil {
-		return nil, fmt.Errorf("TLS handshake failed: %w", err)
 	}
 
 	chain := buildChain(certs)
@@ -92,6 +95,32 @@ func buildChain(certs []*x509.Certificate) *ChainInfo {
 		chain.Certificates = append(chain.Certificates, CertInfoFromCert(cert))
 	}
 	return chain
+}
+
+func isVerificationError(err error) bool {
+	var hostErr x509.HostnameError
+	var unknownAuth x509.UnknownAuthorityError
+	var certInvalid x509.CertificateInvalidError
+	var sysRoots x509.SystemRootsError
+	return errors.As(err, &hostErr) ||
+		errors.As(err, &unknownAuth) ||
+		errors.As(err, &certInvalid) ||
+		errors.As(err, &sysRoots)
+}
+
+func abbreviateVerifyErrorWithChain(err error, certs []*x509.Certificate) string {
+	var unknownAuth x509.UnknownAuthorityError
+	if errors.As(err, &unknownAuth) && len(certs) > 0 {
+		top := certs[len(certs)-1]
+		if !isSelfSigned(top) {
+			return "incomplete chain"
+		}
+	}
+	return abbreviateVerifyError(err)
+}
+
+func isSelfSigned(cert *x509.Certificate) bool {
+	return bytes.Equal(cert.RawIssuer, cert.RawSubject)
 }
 
 func abbreviateVerifyError(err error) string {

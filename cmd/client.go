@@ -51,7 +51,6 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	var tlsVersions bool
 	var serverName string
 	var startTLS string
-	var insecure bool
 	var rf revocationFlags
 
 	cmd := &cobra.Command{
@@ -90,7 +89,6 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 				TLSVersions: tlsVersions,
 				ServerName:  serverName,
 				StartTLS:    startTLS,
-				Insecure:    insecure,
 			}
 
 			now := rt.NowFunc()
@@ -141,7 +139,6 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	cmd.Flags().BoolVar(&tlsVersions, "tls-versions", false, "Probe and display supported TLS versions")
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
 	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: "+tlsquery.StartTLSProtocolList())
-	cmd.Flags().BoolVarP(&insecure, "insecure", "k", false, "Skip TLS certificate verification")
 	addRevocationFlags(cmd, &rf)
 	addCertFlags(cmd)
 

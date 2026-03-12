@@ -89,7 +89,7 @@ func verifyPEMChain(chain *ChainInfo, certs []*x509.Certificate, opts PEMOptions
 
 	if _, err := leaf.Verify(verifyOpts); err != nil {
 		chain.Verified = false
-		chain.VerificationError = abbreviateVerifyError(err)
+		chain.VerificationError = abbreviateVerifyErrorWithChain(err, certs)
 	} else {
 		chain.Verified = true
 	}

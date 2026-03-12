@@ -38,10 +38,10 @@
 
 ```
 $ tlsctl client github.com
-github.com (secure, expires in 52 days) ✓
+github.com (secure, expires in 84 days) ✓
   Subject:  CN=github.com
   Issuer:   CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB
-  Validity: 2026-01-06 → 2026-04-05
+  Validity: 2026-03-06 → 2026-06-03
   SANs:     github.com, www.github.com
 
   Chain: github.com → Sectigo Public Server Authentication CA DV E36 → Sectigo Public Server Authentication Root E46 (3 certificates)
@@ -129,7 +129,7 @@ tlsctl pem cert.pem
 
 ```
 $ tlsctl client badssl.com
-*.badssl.com (secure, expires in 66 days) ✓
+*.badssl.com (secure, expires in 40 days) ✓
   Subject:  CN=*.badssl.com
   Issuer:   CN=R13,O=Let's Encrypt,C=US
   Validity: 2026-01-20 → 2026-04-20
@@ -142,7 +142,7 @@ $ tlsctl client badssl.com
 
 ```
 $ tlsctl client expired.badssl.com
-*.badssl.com (insecure, certificate expired, expires in -3958 days) ✗
+*.badssl.com (insecure, certificate expired, expired 3985 days ago) ✗
   Subject:  CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard
   Issuer:   CN=COMODO RSA Domain Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB
   Validity: 2015-04-09 → 2015-04-12
@@ -155,7 +155,7 @@ $ tlsctl client expired.badssl.com
 
 ```
 $ tlsctl client wrong.host.badssl.com
-*.badssl.com (insecure, hostname mismatch, expires in 66 days) ✗
+*.badssl.com (insecure, hostname mismatch, expires in 40 days) ✗
   Subject:  CN=*.badssl.com
   Issuer:   CN=R13,O=Let's Encrypt,C=US
   Validity: 2026-01-20 → 2026-04-20
@@ -168,10 +168,10 @@ $ tlsctl client wrong.host.badssl.com
 
 ```
 $ tlsctl client self-signed.badssl.com
-*.badssl.com (insecure, unknown authority, expires in 727 days) ✗
+*.badssl.com (insecure, unknown authority, expires in 729 days) ✗
   Subject:  CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
   Issuer:   CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
-  Validity: 2026-02-10 → 2028-02-10
+  Validity: 2026-03-10 → 2028-03-09
   SANs:     *.badssl.com, badssl.com
 ```
 
@@ -179,10 +179,10 @@ $ tlsctl client self-signed.badssl.com
 
 ```
 $ tlsctl client untrusted-root.badssl.com
-*.badssl.com (insecure, unknown authority, expires in 727 days) ✗
+*.badssl.com (insecure, unknown authority, expires in 729 days) ✗
   Subject:  CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
   Issuer:   CN=BadSSL Untrusted Root Certificate Authority,O=BadSSL,L=San Francisco,ST=California,C=US
-  Validity: 2026-02-10 → 2028-02-10
+  Validity: 2026-03-10 → 2028-03-09
   SANs:     *.badssl.com, badssl.com
 
   Chain: *.badssl.com → BadSSL Untrusted Root Certificate Authority (2 certificates)
@@ -192,7 +192,7 @@ $ tlsctl client untrusted-root.badssl.com
 
 ```
 $ tlsctl client incomplete-chain.badssl.com
-*.badssl.com (insecure, unknown authority, expires in 66 days) ✗
+*.badssl.com (insecure, incomplete chain, expires in 39 days) ✗
   Subject:  CN=*.badssl.com
   Issuer:   CN=R13,O=Let's Encrypt,C=US
   Validity: 2026-01-20 → 2026-04-20
@@ -203,24 +203,24 @@ $ tlsctl client incomplete-chain.badssl.com
 
 ```
 $ tlsctl client --revocation crl revoked.badssl.com
-revoked.badssl.com (secure, expires in 52 days) ✓
+revoked.badssl.com (secure, expires in 89 days) ✓
   Subject:  CN=revoked.badssl.com
-  Issuer:   CN=E7,O=Let's Encrypt,C=US
-  Validity: 2026-01-06 → 2026-04-06
+  Issuer:   CN=E8,O=Let's Encrypt,C=US
+  Validity: 2026-03-10 → 2026-06-08
   SANs:     revoked.badssl.com
   Revocation: REVOKED (CRL)
 
-  Chain: revoked.badssl.com → E7 (2 certificates)
+  Chain: revoked.badssl.com → E8 (2 certificates)
 ```
 
 ### Revocation checking with OCSP
 
 ```
 $ tlsctl client --revocation ocsp google.com
-*.google.com (secure, expires in 59 days) ✓
+*.google.com (secure, expires in 46 days) ✓
   Subject:  CN=*.google.com
   Issuer:   CN=WR2,O=Google Trust Services,C=US
-  Validity: 2026-01-19 → 2026-04-13
+  Validity: 2026-02-02 → 2026-04-27
   SANs:     *.google.com, *.appengine.google.com, *.bdn.dev, *.origin-test.bdn.dev, *.cloud.google.com (+132 more)
   Revocation: not revoked (OCSP)
 
@@ -233,18 +233,24 @@ Use `--tls-versions` to probe supported TLS versions and enumerate server-side c
 
 ```
 $ tlsctl client --tls-versions badssl.com
-*.badssl.com (secure, expires in 66 days) ✓
+*.badssl.com (secure, expires in 40 days) ✓
   Subject:  CN=*.badssl.com
   Issuer:   CN=R13,O=Let's Encrypt,C=US
   Validity: 2026-01-20 → 2026-04-20
   SANs:     *.badssl.com, badssl.com
-  TLS:      TLS 1.2, TLS 1.3
+  TLS:      TLS 1.0, TLS 1.1, TLS 1.2
+  Ciphers (TLS 1.0):
+    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+    TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+    ...
+  Ciphers (TLS 1.1):
+    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+    TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
+    ...
   Ciphers (TLS 1.2):
     TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
     TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
-  Ciphers (TLS 1.3):
-    TLS_AES_256_GCM_SHA384
+    ...
 
   Chain: *.badssl.com → R13 (2 certificates)
 ```

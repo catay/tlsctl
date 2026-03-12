@@ -24,7 +24,7 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 	server, addr := startTestTLSServer(t, false)
 	defer server.Close()
 
-	chain, err := Query(addr, QueryOptions{Insecure: true})
+	chain, err := Query(addr, QueryOptions{})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
@@ -44,10 +44,10 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 		t.Errorf("expected 2 SANs, got %d", len(leaf.SubjectAltNames))
 	}
 	if chain.Verified {
-		t.Error("expected Verified to be false with Insecure option")
+		t.Error("expected Verified to be false for self-signed test certificate")
 	}
 	if chain.VerificationError == "" {
-		t.Error("expected VerificationError to be set with Insecure option")
+		t.Error("expected VerificationError to be set for self-signed test certificate")
 	}
 }
 
@@ -309,7 +309,7 @@ func TestQuery_ViaProxy(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, false)
 	defer cleanup()
 
-	chain, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr, Insecure: true})
+	chain, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr})
 	if err != nil {
 		t.Fatalf("Query via proxy failed: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestQuery_ViaProxyWithAuth(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, true)
 	defer cleanup()
 
-	chain, err := Query(addr, QueryOptions{Proxy: "http://user:pass@" + proxyAddr, Insecure: true})
+	chain, err := Query(addr, QueryOptions{Proxy: "http://user:pass@" + proxyAddr})
 	if err != nil {
 		t.Fatalf("Query via proxy with auth failed: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestQuery_ViaProxyAuthRequired(t *testing.T) {
 	proxyAddr, cleanup := startTestHTTPProxy(t, addr, true)
 	defer cleanup()
 
-	_, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr, Insecure: true})
+	_, err := Query(addr, QueryOptions{Proxy: "http://" + proxyAddr})
 	if err == nil {
 		t.Error("expected error when proxy requires auth but none provided")
 	}

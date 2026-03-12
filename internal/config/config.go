@@ -52,7 +52,6 @@ type ClientSettings struct {
 	TLSVersions        *bool     `json:"tls-versions,omitempty"`
 	ServerName         *string   `json:"servername,omitempty"`
 	StartTLS           *string   `json:"starttls,omitempty"`
-	Insecure           *bool     `json:"insecure,omitempty"`
 	Revocation         *string   `json:"revocation,omitempty"`
 	RevocationTimeout  *Duration `json:"revocation-timeout,omitempty"`
 	RevocationSoftFail *bool     `json:"revocation-soft-fail,omitempty"`
@@ -212,9 +211,6 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 	}
 	if c.StartTLS != nil {
 		vals["starttls"] = *c.StartTLS
-	}
-	if c.Insecure != nil {
-		vals["insecure"] = boolStr(*c.Insecure)
 	}
 	if c.Revocation != nil {
 		vals["revocation"] = *c.Revocation

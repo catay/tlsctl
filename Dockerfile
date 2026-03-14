@@ -11,7 +11,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o tlsctl .
 
 # Final stage
-FROM alpine:3.20
+FROM alpine:3.23
 
 RUN set -eux; addgroup -g 6666 tlsctl && adduser -u 6666 -G tlsctl -D -H tlsctl
 

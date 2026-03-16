@@ -43,6 +43,17 @@ changelog:
       - '^test:'
       - '^chore:'
 
+dockers_v2:
+  - images:
+      - "cataybe/tlsctl"
+    tags:
+      - "v{{ .Version }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: Dockerfile.goreleaser
+
 release:
   github:
     owner: catay

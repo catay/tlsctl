@@ -1,0 +1,11 @@
+FROM alpine:3.23
+
+ARG TARGETPLATFORM
+
+RUN set -eux; addgroup -g 6666 tlsctl && adduser -u 6666 -G tlsctl -D -H tlsctl
+
+COPY ${TARGETPLATFORM}/tlsctl /usr/bin/tlsctl
+
+USER tlsctl:tlsctl
+
+ENTRYPOINT ["/usr/bin/tlsctl"]

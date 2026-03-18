@@ -97,13 +97,13 @@ Pre-built images are published to Docker Hub on every release:
 
 ```bash
 # Pull and run the latest release
-docker run --rm catay/tlsctl client github.com
+docker run --rm cataybe/tlsctl client github.com
 
 # Use a specific version
-docker run --rm catay/tlsctl:v1.1.0 client github.com
+docker run --rm cataybe/tlsctl:v1.1.0 client github.com
 
 # Inspect a local PEM file (mount it into the container)
-docker run --rm -v /path/to/cert.pem:/cert.pem:ro catay/tlsctl pem /cert.pem
+docker run --rm -v /path/to/cert.pem:/cert.pem:ro cataybe/tlsctl pem /cert.pem
 ```
 
 You can also build the image locally:

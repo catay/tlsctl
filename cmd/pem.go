@@ -47,6 +47,10 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 					return fmt.Errorf("failed to read stdin: %w", rErr)
 				}
 				chainInfo, err = tlsquery.ParsePEM(data, opts)
+				if err == nil {
+					chainInfo.InputName = "stdin"
+					chainInfo.InputLabel = "source"
+				}
 			} else {
 				chainInfo, err = tlsquery.ParsePEMFile(args[0], opts)
 			}
@@ -72,7 +76,7 @@ func newPemCmd(rt *Runtime) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, text (verbose), raw (PEM)")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, csv, csv-full, text (verbose), raw (PEM)")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	addRevocationFlags(cmd, &rf)
 	addCertFlags(cmd)

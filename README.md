@@ -68,16 +68,16 @@ Download the latest release for your platform from the [GitHub Releases](https:/
 
 | Platform       | Architecture | Archive |
 |----------------|-------------|---------|
-| Linux          | amd64       | [`tlsctl_1.1.0_linux_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_linux_amd64.tar.gz) |
-| Linux          | arm64       | [`tlsctl_1.1.0_linux_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_linux_arm64.tar.gz) |
-| macOS          | amd64       | [`tlsctl_1.1.0_darwin_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_darwin_amd64.tar.gz) |
-| macOS          | arm64       | [`tlsctl_1.1.0_darwin_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_darwin_arm64.tar.gz) |
-| Windows        | amd64       | [`tlsctl_1.1.0_windows_amd64.zip`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_windows_amd64.zip) |
-| Windows        | arm64       | [`tlsctl_1.1.0_windows_arm64.zip`](https://github.com/catay/tlsctl/releases/download/v1.1.0/tlsctl_1.1.0_windows_arm64.zip) |
+| Linux          | amd64       | [`tlsctl_1.2.0_linux_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_linux_amd64.tar.gz) |
+| Linux          | arm64       | [`tlsctl_1.2.0_linux_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_linux_arm64.tar.gz) |
+| macOS          | amd64       | [`tlsctl_1.2.0_darwin_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_darwin_amd64.tar.gz) |
+| macOS          | arm64       | [`tlsctl_1.2.0_darwin_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_darwin_arm64.tar.gz) |
+| Windows        | amd64       | [`tlsctl_1.2.0_windows_amd64.zip`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_windows_amd64.zip) |
+| Windows        | arm64       | [`tlsctl_1.2.0_windows_arm64.zip`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_windows_arm64.zip) |
 
 ```bash
 # Example: install on Linux amd64
-curl -sL https://github.com/catay/tlsctl/releases/latest/download/tlsctl_1.1.0_linux_amd64.tar.gz | tar xz
+curl -sL https://github.com/catay/tlsctl/releases/latest/download/tlsctl_1.2.0_linux_amd64.tar.gz | tar xz
 sudo mv tlsctl /usr/local/bin/
 ```
 
@@ -100,7 +100,7 @@ Pre-built images are published to Docker Hub on every release:
 docker run --rm cataybe/tlsctl client github.com
 
 # Use a specific version
-docker run --rm cataybe/tlsctl:v1.1.0 client github.com
+docker run --rm cataybe/tlsctl:v1.2.0 client github.com
 
 # Inspect a local PEM file (mount it into the container)
 docker run --rm -v /path/to/cert.pem:/cert.pem:ro cataybe/tlsctl pem /cert.pem

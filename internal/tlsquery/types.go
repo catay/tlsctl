@@ -59,6 +59,8 @@ type ChainInfo struct {
 	Verified          bool             `json:"verified" yaml:"verified"`
 	VerificationError string           `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
 	TLSVersions       []TLSVersionInfo `json:"tls_versions,omitempty" yaml:"tls_versions,omitempty"`
+	InputName         string           `json:"-" yaml:"-"`
+	InputLabel        string           `json:"-" yaml:"-"`
 }
 
 // QueryOptions configures the TLS query behavior.

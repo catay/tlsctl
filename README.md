@@ -50,7 +50,7 @@ github.com (secure, expires in 84 days) ✓
 ## Why tlsctl?
 
 - **Instant insights** — One command shows certificate status, chain, SANs, and expiry at a glance
-- **Multiple output formats** — Human-readable, JSON, YAML, verbose text, or raw PEM
+- **Multiple output formats** — Human-readable, JSON, YAML, concise CSV, full CSV, verbose text, or raw PEM
 - **Revocation checking** — Built-in CRL and OCSP support to detect revoked certificates
 - **PEM file parsing** — Inspect local certificate files with the same rich output
 - **Custom CA support** — Validate against private CAs with `--cacert`
@@ -270,7 +270,7 @@ suite is reported because Go's `crypto/tls` does not allow configuring TLS 1.3 c
 suites individually.
 
 In human output, insecure cipher suites are highlighted in red and tagged with `(insecure)`.
-In non-human outputs (`json`, `yaml`, and `text`), cipher suites are split into
+In non-human outputs (`json`, `yaml`, `csv-full`, and `text`), cipher suites are split into
 `secure_cipher_suites` and `insecure_cipher_suites`.
 
 ### Verbose text output
@@ -393,6 +393,21 @@ certificates:
       - badssl.com
 verified: true
 ```
+
+### CSV output
+
+Use `-o csv` for a concise, spreadsheet-friendly summary. Each input produces one row based on the leaf certificate:
+
+```bash
+$ tlsctl client -o csv badssl.com
+```
+
+```csv
+target,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
+badssl.com:443,*.badssl.com,"CN=R13,O=Let's Encrypt,C=US",2026-01-20T20:02:51Z,2026-04-20T20:02:50Z,90,b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:...,"*.badssl.com; badssl.com"
+```
+
+Use `-o csv-full` if you want the row-per-certificate export with the wider field set.
 
 ### Raw PEM output
 
@@ -543,6 +558,8 @@ tlsctl client -o json google.com github.com | jq -r '.[] | .certificates[] | sel
 | Text | `-o text` | Verbose output with all certificate fields |
 | JSON | `-o json` | Full structured JSON, ideal for scripting and automation |
 | YAML | `-o yaml` | Full structured YAML |
+| CSV | `-o csv` | Concise one-row-per-input summary using the leaf certificate |
+| CSV Full | `-o csv-full` | Wide row-per-certificate export for detailed tabular processing |
 | Raw | `-o raw` | PEM-encoded certificates |
 
 ## Exit codes

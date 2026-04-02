@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/csv"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -14,6 +15,8 @@ import (
 
 func testChain() *tlsquery.ChainInfo {
 	return &tlsquery.ChainInfo{
+		InputName:  "test.example.com:443",
+		InputLabel: "target",
 		Certificates: []tlsquery.CertInfo{
 			{
 				Type:               "leaf",
@@ -27,7 +30,11 @@ func testChain() *tlsquery.ChainInfo {
 				NotAfter:           "2027-01-01T00:00:00Z",
 				PublicKeyAlgorithm: "RSA",
 				SubjectAltNames:    []string{"test.example.com", "www.example.com"},
-				PEM:                "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n",
+				Fingerprint: tlsquery.Fingerprint{
+					SHA1:   "11:22:33",
+					SHA256: "aa:bb:cc",
+				},
+				PEM: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n",
 			},
 		},
 	}
@@ -63,6 +70,8 @@ func TestNewFactory(t *testing.T) {
 		{FormatHuman, "HumanRenderer", false},
 		{FormatJSON, "JSONRenderer", false},
 		{FormatYAML, "YAMLRenderer", false},
+		{FormatCSV, "CSVRenderer", false},
+		{FormatCSVFull, "CSVFullRenderer", false},
 		{FormatText, "VerboseTextRenderer", false},
 		{FormatRaw, "RawPEMRenderer", false},
 		{"invalid", "", true},
@@ -168,6 +177,86 @@ func TestYAMLRenderer(t *testing.T) {
 	}
 	if len(result.TLSVersions[0].InsecureCipherSuites) != 1 {
 		t.Errorf("expected insecure cipher suites in YAML output")
+	}
+}
+
+func TestCSVRenderer(t *testing.T) {
+	chain := testChain()
+	chain.Verified = true
+	secureCipher, insecureCipher := sampleCipherSuites(t)
+	chain.TLSVersions = []tlsquery.TLSVersionInfo{
+		{
+			Version:              "TLS 1.2",
+			CipherSuites:         []string{secureCipher, insecureCipher},
+			SecureCipherSuites:   []string{secureCipher},
+			InsecureCipherSuites: []string{insecureCipher},
+		},
+	}
+	var buf bytes.Buffer
+	r := CSVRenderer{}
+
+	if err := r.Render(&buf, chain, Options{Now: fixedNow}); err != nil {
+		t.Fatalf("Render failed: %v", err)
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected header plus one row, got %d rows", len(rows))
+	}
+
+	record := make(map[string]string, len(rows[0]))
+	for i, header := range rows[0] {
+		record[header] = rows[1][i]
+	}
+
+	if record["target"] != "test.example.com:443" {
+		t.Errorf("expected target=test.example.com:443, got %q", record["target"])
+	}
+	if record["common_name"] != "test.example.com" {
+		t.Errorf("expected common_name=test.example.com, got %q", record["common_name"])
+	}
+	if record["issuer"] != "CN=Test CA" {
+		t.Errorf("expected issuer=CN=Test CA, got %q", record["issuer"])
+	}
+	if record["days_remaining"] != "329" {
+		t.Errorf("expected days_remaining=329, got %q", record["days_remaining"])
+	}
+	if record["sha256"] == "" {
+		t.Error("expected SHA256 fingerprint in CSV output")
+	}
+	if record["subject_alternative_names"] != "test.example.com; www.example.com" {
+		t.Errorf("unexpected SAN value: %q", record["subject_alternative_names"])
+	}
+
+	fullBuf := bytes.Buffer{}
+	full := CSVFullRenderer{}
+	if err := full.Render(&fullBuf, chain, Options{Now: fixedNow}); err != nil {
+		t.Fatalf("CSVFull Render failed: %v", err)
+	}
+
+	fullRows, err := csv.NewReader(bytes.NewReader(fullBuf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV full output: %v", err)
+	}
+	if len(fullRows) != 2 {
+		t.Fatalf("expected header plus one full row, got %d rows", len(fullRows))
+	}
+
+	fullRecord := make(map[string]string, len(fullRows[0]))
+	for i, header := range fullRows[0] {
+		fullRecord[header] = fullRows[1][i]
+	}
+	if fullRecord["certificate_type"] != "leaf" {
+		t.Errorf("expected certificate_type=leaf in csv-full, got %q", fullRecord["certificate_type"])
+	}
+	if !strings.Contains(fullRecord["secure_cipher_suites"], "TLS 1.2: "+secureCipher) {
+		t.Errorf("expected secure cipher suites to include version-qualified entry, got %q", fullRecord["secure_cipher_suites"])
+	}
+	if !strings.Contains(fullRecord["insecure_cipher_suites"], "TLS 1.2: "+insecureCipher) {
+		t.Errorf("expected insecure cipher suites to include version-qualified entry, got %q", fullRecord["insecure_cipher_suites"])
 	}
 }
 

@@ -19,7 +19,13 @@ func ParsePEMFile(path string, opts PEMOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return ParsePEM(data, opts)
+	chain, err := ParsePEM(data, opts)
+	if err != nil {
+		return nil, err
+	}
+	chain.InputName = path
+	chain.InputLabel = "source"
+	return chain, nil
 }
 
 // ParsePEM parses PEM-encoded certificate data and returns certificate information.

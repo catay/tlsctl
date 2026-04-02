@@ -48,6 +48,8 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		chain := buildChain(certs)
 		chain.Verified = false
 		chain.VerificationError = abbreviateVerifyErrorWithChain(verifyErr, certs)
+		chain.InputName = endpoint
+		chain.InputLabel = "target"
 		if probeVersions {
 			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS)
 		}
@@ -56,6 +58,8 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 	chain := buildChain(certs)
 	chain.Verified = true
+	chain.InputName = endpoint
+	chain.InputLabel = "target"
 	if probeVersions {
 		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, false, startTLS)
 	}

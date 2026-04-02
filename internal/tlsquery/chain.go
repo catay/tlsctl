@@ -15,6 +15,8 @@ func (c *ChainInfo) WithoutPEM() *ChainInfo {
 		Verified:          c.Verified,
 		VerificationError: c.VerificationError,
 		TLSVersions:       c.TLSVersions,
+		InputName:         c.InputName,
+		InputLabel:        c.InputLabel,
 	}
 	for i := range c.Certificates {
 		out.Certificates[i] = c.Certificates[i]

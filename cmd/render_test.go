@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -14,7 +15,9 @@ import (
 func testChains() []*tlsquery.ChainInfo {
 	return []*tlsquery.ChainInfo{
 		{
-			Verified: true,
+			InputName:  "a.example.com:443",
+			InputLabel: "target",
+			Verified:   true,
 			Certificates: []tlsquery.CertInfo{
 				{
 					Type:       "leaf",
@@ -28,7 +31,9 @@ func testChains() []*tlsquery.ChainInfo {
 			},
 		},
 		{
-			Verified: true,
+			InputName:  "b.example.com:443",
+			InputLabel: "target",
+			Verified:   true,
 			Certificates: []tlsquery.CertInfo{
 				{
 					Type:       "leaf",
@@ -93,6 +98,55 @@ func TestRenderChains_MultiYAML(t *testing.T) {
 	}
 	if len(result) != 2 {
 		t.Errorf("expected 2 chains, got %d", len(result))
+	}
+}
+
+func TestRenderChains_MultiCSV(t *testing.T) {
+	chains := testChains()
+	var buf bytes.Buffer
+
+	err := renderChains(&buf, output.FormatCSV, chains, output.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV output: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected header plus two rows, got %d rows", len(rows))
+	}
+
+	if rows[0][0] != "target" {
+		t.Fatalf("expected CSV header row, got %q", rows[0][0])
+	}
+	if rows[1][0] != "a.example.com:443" || rows[2][0] != "b.example.com:443" {
+		t.Fatalf("expected target values for both rows, got %q and %q", rows[1][0], rows[2][0])
+	}
+}
+
+func TestRenderChains_MultiCSVFull(t *testing.T) {
+	chains := testChains()
+	var buf bytes.Buffer
+
+	err := renderChains(&buf, output.FormatCSVFull, chains, output.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV full output: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected header plus two rows, got %d rows", len(rows))
+	}
+	if rows[0][0] != "target" {
+		t.Fatalf("expected CSV full header row, got %q", rows[0][0])
+	}
+	if rows[1][2] != "leaf" || rows[2][2] != "leaf" {
+		t.Fatalf("expected leaf certificate rows, got %q and %q", rows[1][2], rows[2][2])
 	}
 }
 

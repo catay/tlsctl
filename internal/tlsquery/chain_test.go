@@ -41,6 +41,8 @@ func TestChainInfo_Leaf(t *testing.T) {
 
 func TestChainInfo_WithoutPEM(t *testing.T) {
 	chain := &ChainInfo{
+		InputName:  "example.com:443",
+		InputLabel: "target",
 		Certificates: []CertInfo{
 			{CommonName: "test", PEM: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"},
 		},
@@ -53,6 +55,12 @@ func TestChainInfo_WithoutPEM(t *testing.T) {
 	}
 	if chain.Certificates[0].PEM == "" {
 		t.Error("original chain should not be modified")
+	}
+	if result.InputName != "example.com:443" {
+		t.Errorf("expected InputName to be preserved, got %q", result.InputName)
+	}
+	if result.InputLabel != "target" {
+		t.Errorf("expected InputLabel to be preserved, got %q", result.InputLabel)
 	}
 }
 

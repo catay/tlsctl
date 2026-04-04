@@ -421,15 +421,6 @@ tlsctl client -o raw badssl.com > chain.pem
 tlsctl client -o raw badssl.com | openssl x509 -noout -text
 ```
 
-### Skip certificate verification
-
-Use `-k` or `--insecure` to skip TLS certificate verification entirely:
-
-```bash
-tlsctl client -k self-signed.example.com
-tlsctl client --insecure internal.example.com
-```
-
 ### Custom CA certificate
 
 Use `--cacert` to validate certificates against a private CA:

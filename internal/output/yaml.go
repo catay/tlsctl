@@ -25,3 +25,12 @@ func (YAMLRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Op
 	encoder.SetIndent(2)
 	return encoder.Encode(clean)
 }
+
+func (YAMLRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options) error {
+	encoder := yaml.NewEncoder(w)
+	encoder.SetIndent(2)
+	if opts.FormatVersionOrDefault() >= 2 {
+		return encoder.Encode(toBatchEnvelopeV2(results, opts))
+	}
+	return encoder.Encode(toBatchResultsV1(results))
+}

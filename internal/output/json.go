@@ -25,3 +25,12 @@ func (JSONRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Op
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(clean)
 }
+
+func (JSONRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	if opts.FormatVersionOrDefault() >= 2 {
+		return encoder.Encode(toBatchEnvelopeV2(results, opts))
+	}
+	return encoder.Encode(toBatchResultsV1(results))
+}

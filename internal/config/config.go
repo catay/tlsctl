@@ -54,6 +54,7 @@ type ClientSettings struct {
 	Quiet              *bool     `json:"quiet,omitempty"`
 	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
 	Output             *string   `json:"output,omitempty"`
+	FormatVersion      *int      `json:"format-version,omitempty"`
 	CACert             *string   `json:"cacert,omitempty"`
 	Proxy              *string   `json:"proxy,omitempty"`
 	File               *string   `json:"file,omitempty"`
@@ -129,6 +130,9 @@ func (s *Settings) validate() error {
 	if err := validateExpiryWarning(s.Client.ExpiryWarning); err != nil {
 		return fmt.Errorf("client.expiry-warning: %w", err)
 	}
+	if err := validateFormatVersion(s.Client.FormatVersion); err != nil {
+		return fmt.Errorf("client.format-version: %w", err)
+	}
 	if err := validateExpiryWarning(s.Pem.ExpiryWarning); err != nil {
 		return fmt.Errorf("pem.expiry-warning: %w", err)
 	}
@@ -177,6 +181,16 @@ func validateStartTLS(v *string) error {
 		return nil
 	}
 	return fmt.Errorf("must be one of %s", tlsquery.StartTLSProtocolList())
+}
+
+func validateFormatVersion(v *int) error {
+	if v == nil {
+		return nil
+	}
+	if *v < 1 || *v > 2 {
+		return fmt.Errorf("must be 1 or 2")
+	}
+	return nil
 }
 
 // FlagValues returns a map of flag-name to string-value for the given
@@ -233,6 +247,9 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 	}
 	if c.Output != nil {
 		vals["output"] = *c.Output
+	}
+	if c.FormatVersion != nil {
+		vals["format-version"] = fmt.Sprintf("%d", *c.FormatVersion)
 	}
 	if c.CACert != nil {
 		vals["cacert"] = *c.CACert

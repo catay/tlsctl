@@ -49,6 +49,26 @@ func testChains() []*tlsquery.ChainInfo {
 	}
 }
 
+func testTargetResults() []targetResult {
+	chains := testChains()
+	return []targetResult{
+		{
+			index:    0,
+			endpoint: "a.example.com:443",
+			chain:    chains[0],
+		},
+		{
+			index:    1,
+			endpoint: "missing.example.com:443",
+			err:      assertError("connection failed"),
+		},
+	}
+}
+
+type assertError string
+
+func (e assertError) Error() string { return string(e) }
+
 func TestRenderChains_Empty(t *testing.T) {
 	var buf bytes.Buffer
 	err := renderChains(&buf, output.FormatJSON, nil, output.Options{})
@@ -194,5 +214,116 @@ func TestRenderChains_RawNoSeparator(t *testing.T) {
 	// Raw format should NOT have blank separator lines between certs
 	if strings.Contains(output, "\n\n-----BEGIN") {
 		t.Error("raw format should not have blank separators between PEM blocks")
+	}
+}
+
+func TestRenderTargetResults_MultiJSONLegacy(t *testing.T) {
+	results := testTargetResults()
+	var buf bytes.Buffer
+
+	renderedErrors, err := renderTargetResults(&buf, output.FormatJSON, results, output.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if renderedErrors {
+		t.Fatal("expected format-version 1 JSON output to keep runtime errors out of structured stdout")
+	}
+
+	var got tlsquery.ChainInfo
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("failed to unmarshal legacy JSON object: %v", err)
+	}
+	if len(got.Certificates) != 1 {
+		t.Fatalf("expected one successful chain in v1 JSON output, got %+v", got)
+	}
+	if got.Certificates[0].PEM != "" {
+		t.Error("PEM should be stripped from JSON output")
+	}
+}
+
+func TestRenderTargetResults_MultiCSVLegacy(t *testing.T) {
+	results := testTargetResults()
+	var buf bytes.Buffer
+
+	renderedErrors, err := renderTargetResults(&buf, output.FormatCSV, results, output.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if renderedErrors {
+		t.Fatal("expected format-version 1 CSV output to keep runtime errors out of structured stdout")
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse legacy CSV output: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected header plus one successful row, got %d rows", len(rows))
+	}
+	if rows[0][0] != "target" || rows[0][1] != "common_name" {
+		t.Fatalf("unexpected legacy CSV headers: %v", rows[0][:2])
+	}
+	if rows[1][0] != "a.example.com:443" {
+		t.Fatalf("unexpected successful CSV row: %v", rows[1])
+	}
+}
+
+func TestRenderTargetResults_SingleJSONBatchV2(t *testing.T) {
+	results := testTargetResults()[:1]
+	var buf bytes.Buffer
+
+	renderedErrors, err := renderTargetResults(&buf, output.FormatJSON, results, output.Options{FormatVersion: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !renderedErrors {
+		t.Fatal("expected json v2 output to render through the batch envelope even for a single target")
+	}
+
+	var envelope output.BatchEnvelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to unmarshal batch envelope: %v", err)
+	}
+	if envelope.Status != output.StatusSuccess {
+		t.Fatalf("expected success envelope status, got %q", envelope.Status)
+	}
+	if envelope.Summary.Total != 1 || envelope.Summary.Succeeded != 1 || envelope.Summary.Failed != 0 {
+		t.Fatalf("unexpected batch summary: %+v", envelope.Summary)
+	}
+	if len(envelope.Results) != 1 || envelope.Results[0].Status != output.StatusSuccess {
+		t.Fatalf("unexpected batch results: %+v", envelope.Results)
+	}
+	if envelope.Results[0].TLSStatus != output.TLSStatusSecure {
+		t.Fatalf("expected secure tls_status, got %+v", envelope.Results[0])
+	}
+}
+
+func TestRenderTargetResults_MultiCSVBatchV2(t *testing.T) {
+	results := testTargetResults()
+	var buf bytes.Buffer
+
+	renderedErrors, err := renderTargetResults(&buf, output.FormatCSV, results, output.Options{FormatVersion: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !renderedErrors {
+		t.Fatal("expected format-version 2 CSV output to render runtime errors inline")
+	}
+
+	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV v2 output: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected header plus two rows, got %d rows", len(rows))
+	}
+	if rows[0][0] != "target" || rows[0][1] != "status" || rows[0][2] != "tls_status" || rows[0][3] != "error" {
+		t.Fatalf("unexpected CSV v2 headers: %v", rows[0][:4])
+	}
+	if rows[1][0] != "a.example.com:443" || rows[1][1] != "success" || rows[1][2] != "secure" || rows[1][3] != "" {
+		t.Fatalf("unexpected success row: %v", rows[1][:4])
+	}
+	if rows[2][0] != "missing.example.com:443" || rows[2][1] != "failure" || rows[2][2] != "" || rows[2][3] != "connection failed" {
+		t.Fatalf("unexpected failed row: %v", rows[2][:4])
 	}
 }

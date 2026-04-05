@@ -115,6 +115,19 @@ func TestLoad_InvalidStartTLS(t *testing.T) {
 	}
 }
 
+func TestLoad_InvalidFormatVersion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"client": {"format-version": 3}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid format-version")
+	}
+}
+
 func TestLoad_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
@@ -123,6 +136,7 @@ func TestLoad_ValidConfig(t *testing.T) {
 		"client": {
 			"expiry-warning": 21,
 			"output": "json",
+			"format-version": 2,
 			"proxy": "http://proxy:8080",
 			"tls-versions": true,
 			"revocation": "ocsp",
@@ -165,6 +179,9 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if s.Client.Output == nil || *s.Client.Output != "json" {
 		t.Error("expected client.output = json")
 	}
+	if s.Client.FormatVersion == nil || *s.Client.FormatVersion != 2 {
+		t.Error("expected client.format-version = 2")
+	}
 	if s.Client.Proxy == nil || *s.Client.Proxy != "http://proxy:8080" {
 		t.Error("expected client.proxy")
 	}
@@ -190,10 +207,12 @@ func TestLoad_ValidConfig(t *testing.T) {
 func TestFlagValues_Client(t *testing.T) {
 	expiry := 21
 	output := "json"
+	formatVersion := 2
 	s := &Settings{
 		Client: ClientSettings{
 			ExpiryWarning: &expiry,
 			Output:        &output,
+			FormatVersion: &formatVersion,
 		},
 	}
 
@@ -203,6 +222,9 @@ func TestFlagValues_Client(t *testing.T) {
 	}
 	if vals["output"] != "json" {
 		t.Errorf("expected output=json, got %s", vals["output"])
+	}
+	if vals["format-version"] != "2" {
+		t.Errorf("expected format-version=2, got %s", vals["format-version"])
 	}
 }
 

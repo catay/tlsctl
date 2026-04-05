@@ -18,6 +18,7 @@ type MultiRenderer interface {
 type Options struct {
 	Now               func() time.Time
 	ExpiryWarningDays int
+	FormatVersion     int
 }
 
 func (o Options) NowFunc() time.Time {
@@ -32,4 +33,11 @@ func (o Options) WarningDays() int {
 		return 30
 	}
 	return o.ExpiryWarningDays
+}
+
+func (o Options) FormatVersionOrDefault() int {
+	if o.FormatVersion <= 0 {
+		return 1
+	}
+	return o.FormatVersion
 }

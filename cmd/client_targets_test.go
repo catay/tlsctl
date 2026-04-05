@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/catay/tlsctl/internal/output"
 )
 
 func TestCollectTargets(t *testing.T) {
@@ -76,6 +78,38 @@ example.org:8443 # inline comment
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateOutputFormatVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		format  string
+		version int
+		wantErr bool
+	}{
+		{name: "default version", format: "", version: 1},
+		{name: "json v2", format: "json", version: 2},
+		{name: "yaml v2", format: "yaml", version: 2},
+		{name: "invalid version", format: "json", version: 3, wantErr: true},
+		{name: "csv v2", format: "csv", version: 2},
+		{name: "csv full v2", format: "csv-full", version: 2},
+		{name: "human v2 unsupported", format: "", version: 2, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateOutputFormatVersion(output.Format(tt.format), tt.version)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}

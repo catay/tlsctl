@@ -45,6 +45,7 @@ func validateRevocationMode(mode string) error {
 
 func newClientCmd(rt *Runtime) *cobra.Command {
 	var outputFormat string
+	var formatVersion int
 	var caCertFile string
 	var proxyURL string
 	var inputFile string
@@ -73,6 +74,9 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			if err := validateRevocationMode(rf.mode); err != nil {
 				return err
 			}
+			if err := validateOutputFormatVersion(output.Format(outputFormat), formatVersion); err != nil {
+				return err
+			}
 
 			if startTLS != "" && !tlsquery.ValidStartTLSProtocol(startTLS) {
 				return fmt.Errorf("invalid --starttls protocol %q: must be one of %s", startTLS, tlsquery.StartTLSProtocolList())
@@ -95,6 +99,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			renderOpts := output.Options{
 				Now:               func() time.Time { return now },
 				ExpiryWarningDays: expiryWarningDays,
+				FormatVersion:     formatVersion,
 			}
 
 			var revocationFn func(*tlsquery.ChainInfo)
@@ -105,7 +110,6 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			}
 
 			results := queryTargets(targets, opts, revocationFn)
-			var chains []*tlsquery.ChainInfo
 			var runtimeErrors []error
 			for _, result := range results {
 				if result.err != nil {
@@ -113,18 +117,22 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 					continue
 				}
 				updateExitCodeForChain(rt.ExitTracker, result.chain, now, expiryWarningDays)
-				chains = append(chains, result.chain)
 			}
 
+			renderedRuntimeErrors := false
 			if !quiet {
-				if err := renderChains(rt.Stdout, output.Format(outputFormat), chains, renderOpts); err != nil {
+				var err error
+				renderedRuntimeErrors, err = renderTargetResults(rt.Stdout, output.Format(outputFormat), results, renderOpts)
+				if err != nil {
 					return err
 				}
 			}
 
 			if len(runtimeErrors) > 0 {
-				for _, err := range runtimeErrors {
-					fmt.Fprintln(rt.Stderr, err)
+				if quiet || !renderedRuntimeErrors {
+					for _, err := range runtimeErrors {
+						fmt.Fprintln(rt.Stderr, err)
+					}
 				}
 				rt.ExitTracker.Set(ExitRuntimeError)
 			}
@@ -133,6 +141,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, csv, csv-full, text (verbose), raw (PEM)")
+	cmd.Flags().IntVar(&formatVersion, "format-version", 1, "Structured output format version for client json, yaml, csv, or csv-full output")
 	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
@@ -143,6 +152,21 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	addCertFlags(cmd)
 
 	return cmd
+}
+
+func validateOutputFormatVersion(format output.Format, version int) error {
+	if version < 1 || version > 2 {
+		return fmt.Errorf("--format-version must be 1 or 2")
+	}
+	if version == 1 {
+		return nil
+	}
+	switch format {
+	case output.FormatJSON, output.FormatYAML, output.FormatCSV, output.FormatCSVFull:
+		return nil
+	default:
+		return fmt.Errorf("--format-version 2 is only supported with --output json, yaml, csv, or csv-full")
+	}
 }
 
 func runRevocationCheck(chain *tlsquery.ChainInfo, mode string, timeout time.Duration, softFail bool) {
@@ -342,6 +366,47 @@ func renderChains(w io.Writer, format output.Format, chains []*tlsquery.ChainInf
 		}
 	}
 	return nil
+}
+
+func renderTargetResults(w io.Writer, format output.Format, results []targetResult, opts output.Options) (bool, error) {
+	if len(results) == 0 {
+		return false, nil
+	}
+
+	renderer, err := output.New(format)
+	if err != nil {
+		return false, err
+	}
+
+	if opts.FormatVersionOrDefault() >= 2 {
+		if batchRenderer, ok := renderer.(output.BatchRenderer); ok {
+			return true, batchRenderer.RenderBatch(w, toOutputTargetResults(results), opts)
+		}
+	}
+
+	var chains []*tlsquery.ChainInfo
+	for _, result := range results {
+		if result.err == nil {
+			chains = append(chains, result.chain)
+		}
+	}
+
+	return false, renderChains(w, format, chains, opts)
+}
+
+func toOutputTargetResults(results []targetResult) []output.TargetResult {
+	batch := make([]output.TargetResult, len(results))
+	for i, result := range results {
+		batch[i] = output.TargetResult{
+			Target: result.endpoint,
+		}
+		if result.err != nil {
+			batch[i].Error = result.err.Error()
+			continue
+		}
+		batch[i].Result = result.chain
+	}
+	return batch
 }
 
 func init() {

@@ -353,6 +353,46 @@ $ tlsctl client -o json badssl.com
 }
 ```
 
+With the default `--format-version 1`, single-target and multi-target output both preserve the legacy schema. For multiple targets, structured stdout contains only successful results and per-target runtime failures are still reported on stderr.
+
+Use `--format-version 2` if you want the same envelope for both single-target and multi-target client output:
+
+```bash
+$ tlsctl client -o json --format-version 2 github.com missing.example.com
+```
+
+```json
+{
+  "status": "partial_success",
+  "summary": {
+    "total": 2,
+    "succeeded": 1,
+    "failed": 1
+  },
+  "results": [
+    {
+      "target": "github.com:443",
+      "status": "success",
+      "tls_status": "secure",
+      "result": {
+        "certificates": [
+          {
+            "type": "leaf",
+            "common_name": "github.com"
+          }
+        ],
+        "verified": true
+      }
+    },
+    {
+      "target": "missing.example.com:443",
+      "status": "failure",
+      "error": "connection failed: dial tcp: lookup missing.example.com: no such host"
+    }
+  ]
+}
+```
+
 When `--tls-versions` is enabled, each `tls_versions` entry includes:
 
 ```json
@@ -394,9 +434,13 @@ certificates:
 verified: true
 ```
 
+With the default `--format-version 1`, YAML also preserves the legacy behavior for both single-target and multi-target runs. Use `--format-version 2` if you want the stable `status` / `summary` / `results` envelope for both single-target and multi-target client output.
+
+In version 2 output, `status` describes whether the query itself succeeded, while `tls_status` describes the TLS health of successful results (`secure`, `expiring`, `insecure`, or `revocation_error`).
+
 ### CSV output
 
-Use `-o csv` for a concise, spreadsheet-friendly summary. Each input produces one row based on the leaf certificate:
+Use `-o csv` for a concise, spreadsheet-friendly summary. Single-target output produces one row based on the leaf certificate:
 
 ```bash
 $ tlsctl client -o csv badssl.com
@@ -405,6 +449,14 @@ $ tlsctl client -o csv badssl.com
 ```csv
 target,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
 badssl.com:443,*.badssl.com,"CN=R13,O=Let's Encrypt,C=US",2026-01-20T20:02:51Z,2026-04-20T20:02:50Z,90,b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:...,"*.badssl.com; badssl.com"
+```
+
+Use `--format-version 2` with `csv` or `csv-full` if you want failed targets included inline with `status` and `error` columns:
+
+```csv
+target,status,tls_status,error,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
+github.com:443,success,secure,,github.com,"CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",2026-03-06T00:00:00Z,2026-06-03T23:59:59Z,89,ab:cd:ef:...,"github.com; www.github.com"
+missing.example.com:443,failure,,connection failed: dial tcp: lookup missing.example.com: no such host,,,,,,,
 ```
 
 Use `-o csv-full` if you want the row-per-certificate export with the wider field set.
@@ -537,8 +589,8 @@ tlsctl client -o json example.com | jq -r '.certificates[] | "\(.type): \(.seria
 # Count the number of SANs on the leaf certificate
 tlsctl client -o json example.com | jq '.certificates[] | select(.type == "leaf") | .subject_alternative_names | length'
 
-# Check multiple hosts and report their expiry dates
-tlsctl client -o json google.com github.com | jq -r '.[] | .certificates[] | select(.type == "leaf") | "\(.common_name) expires \(.not_after)"'
+# Check multiple hosts and report their expiry dates with the stable v2 envelope
+tlsctl client -o json --format-version 2 google.com github.com | jq -r '.results[] | select(.status == "success") | .result.certificates[] | select(.type == "leaf") | "\(.common_name) expires \(.not_after)"'
 ```
 
 ## Output formats
@@ -633,6 +685,7 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
   "client": {
     "quiet": true,
     "expiry-warning": 21,
+    "format-version": 2,
     "proxy": "http://proxy:8080",
     "tls-versions": true,
     "revocation-soft-fail": false
@@ -644,7 +697,7 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
 }
 ```
 
-The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
+The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version` for versioned `json`, `yaml`, `csv`, and `csv-full` output. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
 
 Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
 

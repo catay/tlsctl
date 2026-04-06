@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 // Query connects to the given endpoint and retrieves certificate chain information.
@@ -20,6 +21,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 	probeVersions := opts.TLSVersions
 	startTLS := opts.StartTLS
+	connectTimeout, handshakeTimeout := resolveTimeouts(opts)
 
 	host, _, _ := net.SplitHostPort(endpoint)
 	if config.ServerName == "" && host != "" {
@@ -31,7 +33,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
 
-	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS)
+	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS, connectTimeout, handshakeTimeout)
 	if err != nil {
 		if !isVerificationError(err) {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
@@ -40,7 +42,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 		insecureConfig := config.Clone()
 		insecureConfig.InsecureSkipVerify = true
-		certs, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS)
+		certs, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS, connectTimeout, handshakeTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
 		}
@@ -51,7 +53,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		chain.InputName = endpoint
 		chain.InputLabel = "target"
 		if probeVersions {
-			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS)
+			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS, connectTimeout, handshakeTimeout)
 		}
 		return chain, nil
 	}
@@ -61,9 +63,23 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	chain.InputName = endpoint
 	chain.InputLabel = "target"
 	if probeVersions {
-		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, false, startTLS)
+		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, false, startTLS, connectTimeout, handshakeTimeout)
 	}
 	return chain, nil
+}
+
+func resolveTimeouts(opts QueryOptions) (time.Duration, time.Duration) {
+	connectTimeout := opts.ConnectTimeout
+	if connectTimeout <= 0 {
+		connectTimeout = DefaultConnectTimeout
+	}
+
+	handshakeTimeout := opts.HandshakeTimeout
+	if handshakeTimeout <= 0 {
+		handshakeTimeout = DefaultHandshakeTimeout
+	}
+
+	return connectTimeout, handshakeTimeout
 }
 
 func buildConfig(opts QueryOptions) (*tls.Config, error) {

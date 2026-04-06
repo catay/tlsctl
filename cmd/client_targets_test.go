@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/catay/tlsctl/internal/output"
 )
@@ -102,6 +103,53 @@ func TestValidateOutputFormatVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateOutputFormatVersion(output.Format(tt.format), tt.version)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateConnectionTimeouts(t *testing.T) {
+	tests := []struct {
+		name    string
+		flags   connectionFlags
+		wantErr bool
+	}{
+		{
+			name: "valid",
+			flags: connectionFlags{
+				connectTimeout:   time.Second,
+				handshakeTimeout: 2 * time.Second,
+			},
+		},
+		{
+			name: "invalid connect timeout",
+			flags: connectionFlags{
+				connectTimeout:   0,
+				handshakeTimeout: time.Second,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid handshake timeout",
+			flags: connectionFlags{
+				connectTimeout:   time.Second,
+				handshakeTimeout: 0,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateConnectionTimeouts(tt.flags)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

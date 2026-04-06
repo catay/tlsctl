@@ -128,6 +128,32 @@ func TestLoad_InvalidFormatVersion(t *testing.T) {
 	}
 }
 
+func TestLoad_InvalidConnectionTimeout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"client": {"connect-timeout": "0s"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid connect-timeout")
+	}
+}
+
+func TestLoad_InvalidHandshakeTimeout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"global": {"handshake-timeout": "-1s"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid handshake-timeout")
+	}
+}
+
 func TestLoad_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
@@ -139,6 +165,8 @@ func TestLoad_ValidConfig(t *testing.T) {
 			"format-version": 2,
 			"proxy": "http://proxy:8080",
 			"tls-versions": true,
+			"connect-timeout": "4s",
+			"handshake-timeout": "9s",
 			"revocation": "ocsp",
 			"revocation-timeout": "10s",
 			"revocation-soft-fail": false,
@@ -188,6 +216,12 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if s.Client.TLSVersions == nil || !*s.Client.TLSVersions {
 		t.Error("expected client.tls-versions = true")
 	}
+	if s.Client.ConnectTimeout == nil || s.Client.ConnectTimeout.Duration != 4*time.Second {
+		t.Error("expected client.connect-timeout = 4s")
+	}
+	if s.Client.HandshakeTimeout == nil || s.Client.HandshakeTimeout.Duration != 9*time.Second {
+		t.Error("expected client.handshake-timeout = 9s")
+	}
 	if s.Client.RevocationTimeout == nil || s.Client.RevocationTimeout.Duration != 10*time.Second {
 		t.Error("expected client.revocation-timeout = 10s")
 	}
@@ -208,11 +242,15 @@ func TestFlagValues_Client(t *testing.T) {
 	expiry := 21
 	output := "json"
 	formatVersion := 2
+	connectTimeout := Duration{Duration: 4 * time.Second}
+	handshakeTimeout := Duration{Duration: 9 * time.Second}
 	s := &Settings{
 		Client: ClientSettings{
-			ExpiryWarning: &expiry,
-			Output:        &output,
-			FormatVersion: &formatVersion,
+			ExpiryWarning:    &expiry,
+			Output:           &output,
+			FormatVersion:    &formatVersion,
+			ConnectTimeout:   &connectTimeout,
+			HandshakeTimeout: &handshakeTimeout,
 		},
 	}
 
@@ -225,6 +263,12 @@ func TestFlagValues_Client(t *testing.T) {
 	}
 	if vals["format-version"] != "2" {
 		t.Errorf("expected format-version=2, got %s", vals["format-version"])
+	}
+	if vals["connect-timeout"] != "4s" {
+		t.Errorf("expected connect-timeout=4s, got %s", vals["connect-timeout"])
+	}
+	if vals["handshake-timeout"] != "9s" {
+		t.Errorf("expected handshake-timeout=9s, got %s", vals["handshake-timeout"])
 	}
 }
 
@@ -314,12 +358,14 @@ func TestFlagValues_GlobalAppliedWhenSubcommandUnset(t *testing.T) {
 	globalExpiry := 30
 	globalOutput := "yaml"
 	globalRevocation := "ocsp"
+	globalConnectTimeout := Duration{Duration: 5 * time.Second}
 
 	s := &Settings{
 		Global: GlobalSettings{
-			ExpiryWarning: &globalExpiry,
-			Output:        &globalOutput,
-			Revocation:    &globalRevocation,
+			ExpiryWarning:  &globalExpiry,
+			Output:         &globalOutput,
+			ConnectTimeout: &globalConnectTimeout,
+			Revocation:     &globalRevocation,
 		},
 	}
 
@@ -329,6 +375,9 @@ func TestFlagValues_GlobalAppliedWhenSubcommandUnset(t *testing.T) {
 	}
 	if vals["output"] != "yaml" {
 		t.Errorf("expected global output=yaml, got %s", vals["output"])
+	}
+	if vals["connect-timeout"] != "5s" {
+		t.Errorf("expected global connect-timeout=5s, got %s", vals["connect-timeout"])
 	}
 	if vals["revocation"] != "ocsp" {
 		t.Errorf("expected global revocation=ocsp, got %s", vals["revocation"])
@@ -407,6 +456,8 @@ func TestLoad_ValidGlobalConfig(t *testing.T) {
 			"expiry-warning": 45,
 			"output": "json",
 			"cacert": "/etc/ssl/ca.pem",
+			"connect-timeout": "6s",
+			"handshake-timeout": "12s",
 			"revocation": "crl",
 			"revocation-timeout": "8s",
 			"revocation-soft-fail": false
@@ -428,6 +479,12 @@ func TestLoad_ValidGlobalConfig(t *testing.T) {
 	}
 	if s.Global.CACert == nil || *s.Global.CACert != "/etc/ssl/ca.pem" {
 		t.Error("expected global.cacert = /etc/ssl/ca.pem")
+	}
+	if s.Global.ConnectTimeout == nil || s.Global.ConnectTimeout.Duration != 6*time.Second {
+		t.Error("expected global.connect-timeout = 6s")
+	}
+	if s.Global.HandshakeTimeout == nil || s.Global.HandshakeTimeout.Duration != 12*time.Second {
+		t.Error("expected global.handshake-timeout = 12s")
 	}
 	if s.Global.Revocation == nil || *s.Global.Revocation != "crl" {
 		t.Error("expected global.revocation = crl")

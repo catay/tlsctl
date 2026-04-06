@@ -125,6 +125,12 @@ tlsctl client --file hosts.txt
 # Probe supported TLS versions and cipher suites
 tlsctl client --tls-versions example.com
 
+# Show what the default handshake negotiated
+tlsctl client example.com
+
+# Negotiate ALPN explicitly
+tlsctl client --alpn h2,http/1.1 example.com
+
 # Use a custom port
 tlsctl client example.com:8443
 
@@ -142,6 +148,7 @@ $ tlsctl client badssl.com
   Subject:  CN=*.badssl.com
   Issuer:   CN=R13,O=Let's Encrypt,C=US
   Validity: 2026-01-20 → 2026-04-20
+  Handshake: TLS 1.2 / TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
   SANs:     *.badssl.com, badssl.com
 
   Chain: *.badssl.com → R13 (2 certificates)
@@ -273,6 +280,29 @@ In human output, insecure cipher suites are highlighted in red and tagged with `
 In non-human outputs (`json`, `yaml`, `csv-full`, and `text`), cipher suites are split into
 `secure_cipher_suites` and `insecure_cipher_suites`.
 
+### Showing negotiated handshake details
+
+The human-readable client output always shows the negotiated TLS version, cipher suite, and,
+when present, ALPN for the default connection. If you want ALPN to be negotiated, advertise
+protocols with `--alpn`:
+
+```
+$ tlsctl client --alpn h2,http/1.1 github.com
+github.com (secure, expires in 84 days) ✓
+  Subject:  CN=github.com
+  Issuer:   CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB
+  Validity: 2026-03-06 → 2026-06-03
+  Handshake: TLS 1.3 / TLS_AES_128_GCM_SHA256 / h2
+  SANs:     github.com, www.github.com
+
+  Chain: github.com → Sectigo Public Server Authentication CA DV E36 → Sectigo Public Server Authentication Root E46 (3 certificates)
+```
+
+Structured client outputs include the same data under `negotiated_tls` by default.
+
+`--alpn` accepts a comma-separated list such as `h2,http/1.1` and forwards it to the TLS client
+handshake as the advertised ALPN protocol list.
+
 ### Verbose text output
 
 Use `-o text` for the full certificate details:
@@ -327,6 +357,11 @@ $ tlsctl client -o json badssl.com
 
 ```json
 {
+  "negotiated_tls": {
+    "tls_version": "TLS 1.3",
+    "cipher_suite": "TLS_AES_128_GCM_SHA256",
+    "alpn": "h2"
+  },
   "certificates": [
     {
       "type": "leaf",
@@ -375,6 +410,11 @@ $ tlsctl client -o json --format-version 2 github.com missing.example.com
       "status": "success",
       "tls_status": "secure",
       "result": {
+        "negotiated_tls": {
+          "tls_version": "TLS 1.3",
+          "cipher_suite": "TLS_AES_128_GCM_SHA256",
+          "alpn": "h2"
+        },
         "certificates": [
           {
             "type": "leaf",
@@ -447,16 +487,16 @@ $ tlsctl client -o csv badssl.com
 ```
 
 ```csv
-target,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
-badssl.com:443,*.badssl.com,"CN=R13,O=Let's Encrypt,C=US",2026-01-20T20:02:51Z,2026-04-20T20:02:50Z,90,b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:...,"*.badssl.com; badssl.com"
+target,tls_version,cipher_suite,alpn,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
+badssl.com:443,TLS 1.2,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,,*.badssl.com,"CN=R13,O=Let's Encrypt,C=US",2026-01-20T20:02:51Z,2026-04-20T20:02:50Z,90,b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:...,"*.badssl.com; badssl.com"
 ```
 
 Use `--format-version 2` with `csv` or `csv-full` if you want failed targets included inline with `status` and `error` columns:
 
 ```csv
-target,status,tls_status,error,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
-github.com:443,success,secure,,github.com,"CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",2026-03-06T00:00:00Z,2026-06-03T23:59:59Z,89,ab:cd:ef:...,"github.com; www.github.com"
-missing.example.com:443,failure,,connection failed: dial tcp: lookup missing.example.com: no such host,,,,,,,
+target,status,tls_status,error,tls_version,cipher_suite,alpn,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
+github.com:443,success,secure,,TLS 1.3,TLS_AES_128_GCM_SHA256,h2,github.com,"CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",2026-03-06T00:00:00Z,2026-06-03T23:59:59Z,89,ab:cd:ef:...,"github.com; www.github.com"
+missing.example.com:443,failure,,connection failed: dial tcp: lookup missing.example.com: no such host,,,,,,,,,,
 ```
 
 Use `-o csv-full` if you want the row-per-certificate export with the wider field set.
@@ -707,6 +747,7 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
     "format-version": 2,
     "proxy": "http://proxy:8080",
     "tls-versions": true,
+    "alpn": "h2,http/1.1",
     "connect-timeout": "3s",
     "handshake-timeout": "6s",
     "revocation-soft-fail": false
@@ -718,7 +759,7 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
 }
 ```
 
-The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `connect-timeout`, `handshake-timeout`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version`, `proxy`, `file`, `tls-versions`, `servername`, and `starttls` for client-specific behavior. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
+The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `connect-timeout`, `handshake-timeout`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version`, `proxy`, `file`, `tls-versions`, `alpn`, `servername`, and `starttls` for client-specific behavior. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
 
 Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
 

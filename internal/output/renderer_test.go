@@ -25,6 +25,11 @@ func testChain() *tlsquery.ChainInfo {
 	return &tlsquery.ChainInfo{
 		InputName:  "test.example.com:443",
 		InputLabel: "target",
+		NegotiatedTLS: &tlsquery.HandshakeInfo{
+			TLSVersion:  "TLS 1.3",
+			CipherSuite: "TLS_AES_128_GCM_SHA256",
+			ALPN:        "h2",
+		},
 		Certificates: []tlsquery.CertInfo{
 			{
 				Type:               "leaf",
@@ -138,6 +143,9 @@ func TestJSONRenderer(t *testing.T) {
 	if len(result.TLSVersions) != 1 {
 		t.Fatalf("expected 1 tls version entry, got %d", len(result.TLSVersions))
 	}
+	if result.NegotiatedTLS == nil || result.NegotiatedTLS.TLSVersion != "TLS 1.3" {
+		t.Fatalf("expected negotiated tls details in JSON output, got %+v", result.NegotiatedTLS)
+	}
 	if len(result.TLSVersions[0].SecureCipherSuites) != 1 {
 		t.Errorf("expected secure cipher suites in JSON output")
 	}
@@ -179,6 +187,9 @@ func TestYAMLRenderer(t *testing.T) {
 	}
 	if len(result.TLSVersions) != 1 {
 		t.Fatalf("expected 1 tls version entry, got %d", len(result.TLSVersions))
+	}
+	if result.NegotiatedTLS == nil || result.NegotiatedTLS.CipherSuite != "TLS_AES_128_GCM_SHA256" {
+		t.Fatalf("expected negotiated tls details in YAML output, got %+v", result.NegotiatedTLS)
 	}
 	if len(result.TLSVersions[0].SecureCipherSuites) != 1 {
 		t.Errorf("expected secure cipher suites in YAML output")
@@ -461,6 +472,15 @@ func TestCSVRenderer(t *testing.T) {
 	if record["common_name"] != "test.example.com" {
 		t.Errorf("expected common_name=test.example.com, got %q", record["common_name"])
 	}
+	if record["tls_version"] != "TLS 1.3" {
+		t.Errorf("expected tls_version=TLS 1.3, got %q", record["tls_version"])
+	}
+	if record["cipher_suite"] != "TLS_AES_128_GCM_SHA256" {
+		t.Errorf("expected cipher_suite in CSV output, got %q", record["cipher_suite"])
+	}
+	if record["alpn"] != "h2" {
+		t.Errorf("expected alpn=h2, got %q", record["alpn"])
+	}
 	if record["issuer"] != "CN=Test CA" {
 		t.Errorf("expected issuer=CN=Test CA, got %q", record["issuer"])
 	}
@@ -494,6 +514,9 @@ func TestCSVRenderer(t *testing.T) {
 	}
 	if fullRecord["certificate_type"] != "leaf" {
 		t.Errorf("expected certificate_type=leaf in csv-full, got %q", fullRecord["certificate_type"])
+	}
+	if fullRecord["tls_version"] != "TLS 1.3" || fullRecord["cipher_suite"] != "TLS_AES_128_GCM_SHA256" || fullRecord["alpn"] != "h2" {
+		t.Errorf("expected negotiated tls columns in csv-full, got tls_version=%q cipher_suite=%q alpn=%q", fullRecord["tls_version"], fullRecord["cipher_suite"], fullRecord["alpn"])
 	}
 	if !strings.Contains(fullRecord["secure_cipher_suites"], "TLS 1.2: "+secureCipher) {
 		t.Errorf("expected secure cipher suites to include version-qualified entry, got %q", fullRecord["secure_cipher_suites"])
@@ -545,6 +568,9 @@ func TestCSVRendererBatch(t *testing.T) {
 	if record1["common_name"] != "test.example.com" {
 		t.Errorf("unexpected common_name for success row: %q", record1["common_name"])
 	}
+	if record1["tls_version"] != "TLS 1.3" || record1["cipher_suite"] != "TLS_AES_128_GCM_SHA256" || record1["alpn"] != "h2" {
+		t.Errorf("expected negotiated tls fields for success row, got tls_version=%q cipher_suite=%q alpn=%q", record1["tls_version"], record1["cipher_suite"], record1["alpn"])
+	}
 	if record2["target"] != "missing.example.com:443" {
 		t.Errorf("unexpected target for error row: %q", record2["target"])
 	}
@@ -553,6 +579,9 @@ func TestCSVRendererBatch(t *testing.T) {
 	}
 	if record2["common_name"] != "" {
 		t.Errorf("expected empty common_name for failed row, got %q", record2["common_name"])
+	}
+	if record2["tls_version"] != "" || record2["cipher_suite"] != "" || record2["alpn"] != "" {
+		t.Errorf("expected empty negotiated tls fields for failed row, got tls_version=%q cipher_suite=%q alpn=%q", record2["tls_version"], record2["cipher_suite"], record2["alpn"])
 	}
 }
 
@@ -598,6 +627,9 @@ func TestCSVRendererBatchV2(t *testing.T) {
 	if record1["common_name"] != "test.example.com" {
 		t.Errorf("unexpected common_name for success row: %q", record1["common_name"])
 	}
+	if record1["tls_version"] != "TLS 1.3" || record1["cipher_suite"] != "TLS_AES_128_GCM_SHA256" || record1["alpn"] != "h2" {
+		t.Errorf("expected negotiated tls fields for success row, got tls_version=%q cipher_suite=%q alpn=%q", record1["tls_version"], record1["cipher_suite"], record1["alpn"])
+	}
 	if record2["target"] != "missing.example.com:443" {
 		t.Errorf("unexpected target for error row: %q", record2["target"])
 	}
@@ -606,6 +638,9 @@ func TestCSVRendererBatchV2(t *testing.T) {
 	}
 	if record2["common_name"] != "" {
 		t.Errorf("expected empty common_name for failed row, got %q", record2["common_name"])
+	}
+	if record2["tls_version"] != "" || record2["cipher_suite"] != "" || record2["alpn"] != "" {
+		t.Errorf("expected empty negotiated tls fields for failed row, got tls_version=%q cipher_suite=%q alpn=%q", record2["tls_version"], record2["cipher_suite"], record2["alpn"])
 	}
 }
 
@@ -742,6 +777,32 @@ func TestHumanRenderer(t *testing.T) {
 	}
 	if !strings.Contains(output, "expires in") {
 		t.Error("expected expiry info in output")
+	}
+	if !strings.Contains(output, "Handshake: TLS 1.3 / TLS_AES_128_GCM_SHA256 / h2") {
+		t.Fatalf("expected handshake summary in human output, got %q", output)
+	}
+}
+
+func TestVerboseTextRendererNegotiatedTLS(t *testing.T) {
+	chain := testChain()
+	chain.Verified = true
+	var buf bytes.Buffer
+	r := VerboseTextRenderer{}
+
+	err := r.Render(&buf, chain, Options{Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Render failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Negotiated TLS Version: TLS 1.3") {
+		t.Fatalf("expected negotiated tls version in verbose output, got %q", output)
+	}
+	if !strings.Contains(output, "Negotiated Cipher Suite: TLS_AES_128_GCM_SHA256") {
+		t.Fatalf("expected negotiated cipher suite in verbose output, got %q", output)
+	}
+	if !strings.Contains(output, "Negotiated ALPN:       h2") {
+		t.Fatalf("expected negotiated ALPN in verbose output, got %q", output)
 	}
 }
 

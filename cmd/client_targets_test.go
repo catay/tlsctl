@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/catay/tlsctl/internal/output"
+	"github.com/catay/tlsctl/internal/tlsquery"
 )
 
 func TestCollectTargets(t *testing.T) {
@@ -160,5 +161,49 @@ func TestValidateConnectionTimeouts(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestParseALPNProtocols(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    []string
+		wantErr bool
+	}{
+		{name: "empty", input: "", want: nil},
+		{name: "single", input: "h2", want: []string{"h2"}},
+		{name: "multiple", input: "h2,http/1.1", want: []string{"h2", "http/1.1"}},
+		{name: "trim spaces", input: " h2, http/1.1 ", want: []string{"h2", "http/1.1"}},
+		{name: "empty entry", input: "h2,,http/1.1", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tlsquery.ParseALPNProtocols(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewClientCmdALPNFlag(t *testing.T) {
+	cmd := newClientCmd(defaultRuntime)
+	flag := cmd.Flags().Lookup("alpn")
+	if flag == nil {
+		t.Fatal("expected --alpn flag to be registered")
+	}
+	if flag.DefValue != "" {
+		t.Fatalf("expected --alpn default to be empty, got %q", flag.DefValue)
 	}
 }

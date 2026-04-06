@@ -14,6 +14,7 @@ func (c *ChainInfo) WithoutPEM() *ChainInfo {
 		Certificates:      make([]CertInfo, len(c.Certificates)),
 		Verified:          c.Verified,
 		VerificationError: c.VerificationError,
+		NegotiatedTLS:     c.NegotiatedTLS,
 		TLSVersions:       c.TLSVersions,
 		InputName:         c.InputName,
 		InputLabel:        c.InputLabel,

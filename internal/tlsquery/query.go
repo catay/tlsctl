@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+// ParseALPNProtocols normalizes a comma-separated ALPN protocol list.
+func ParseALPNProtocols(value string) ([]string, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(value, ",")
+	protocols := make([]string, 0, len(parts))
+	for _, part := range parts {
+		proto := strings.TrimSpace(part)
+		if proto == "" {
+			return nil, fmt.Errorf("empty ALPN protocol in %q", value)
+		}
+		protocols = append(protocols, proto)
+	}
+
+	return protocols, nil
+}
+
 // Query connects to the given endpoint and retrieves certificate chain information.
 func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	config, err := buildConfig(opts)
@@ -33,7 +52,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
 
-	certs, err := dialAndHandshake(endpoint, proxyURL, config, startTLS, connectTimeout, handshakeTimeout)
+	certs, negotiatedTLS, err := dialAndHandshake(endpoint, proxyURL, config, startTLS, connectTimeout, handshakeTimeout)
 	if err != nil {
 		if !isVerificationError(err) {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
@@ -42,7 +61,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 		insecureConfig := config.Clone()
 		insecureConfig.InsecureSkipVerify = true
-		certs, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS, connectTimeout, handshakeTimeout)
+		certs, negotiatedTLS, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS, connectTimeout, handshakeTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("TLS handshake failed: %w", err)
 		}
@@ -50,6 +69,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 		chain := buildChain(certs)
 		chain.Verified = false
 		chain.VerificationError = abbreviateVerifyErrorWithChain(verifyErr, certs)
+		chain.NegotiatedTLS = negotiatedTLS
 		chain.InputName = endpoint
 		chain.InputLabel = "target"
 		if probeVersions {
@@ -60,6 +80,7 @@ func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
 
 	chain := buildChain(certs)
 	chain.Verified = true
+	chain.NegotiatedTLS = negotiatedTLS
 	chain.InputName = endpoint
 	chain.InputLabel = "target"
 	if probeVersions {
@@ -87,6 +108,9 @@ func buildConfig(opts QueryOptions) (*tls.Config, error) {
 
 	if opts.ServerName != "" {
 		config.ServerName = opts.ServerName
+	}
+	if len(opts.ALPNProtocols) > 0 {
+		config.NextProtos = append([]string(nil), opts.ALPNProtocols...)
 	}
 
 	if opts.CACertFile != "" {

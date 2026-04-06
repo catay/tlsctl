@@ -70,6 +70,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	var proxyURL string
 	var inputFile string
 	var tlsVersions bool
+	var alpnProtocols string
 	var serverName string
 	var startTLS string
 	var rf revocationFlags
@@ -105,6 +106,10 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			if startTLS != "" && !tlsquery.ValidStartTLSProtocol(startTLS) {
 				return fmt.Errorf("invalid --starttls protocol %q: must be one of %s", startTLS, tlsquery.StartTLSProtocolList())
 			}
+			parsedALPNProtocols, err := tlsquery.ParseALPNProtocols(alpnProtocols)
+			if err != nil {
+				return fmt.Errorf("invalid --alpn value: %w", err)
+			}
 
 			targets, err := collectTargets(args, inputFile, startTLS)
 			if err != nil {
@@ -115,6 +120,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 				CACertFile:       caCertFile,
 				Proxy:            proxyURL,
 				TLSVersions:      tlsVersions,
+				ALPNProtocols:    parsedALPNProtocols,
 				ServerName:       serverName,
 				StartTLS:         startTLS,
 				ConnectTimeout:   cf.connectTimeout,
@@ -172,6 +178,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	cmd.Flags().StringVarP(&proxyURL, "proxy", "x", "", "Proxy URL (e.g. http://proxy:8080). Falls back to HTTPS_PROXY/HTTP_PROXY env vars if not set")
 	cmd.Flags().StringVar(&inputFile, "file", "", "Read endpoints from file (one per line, '-' for stdin)")
 	cmd.Flags().BoolVar(&tlsVersions, "tls-versions", false, "Probe and display supported TLS versions")
+	cmd.Flags().StringVar(&alpnProtocols, "alpn", "", "Comma-separated ALPN protocols to advertise in the TLS handshake (for example: h2,http/1.1)")
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
 	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: "+tlsquery.StartTLSProtocolList())
 	addRevocationFlags(cmd, &rf)

@@ -61,6 +61,7 @@ type ClientSettings struct {
 	Proxy              *string   `json:"proxy,omitempty"`
 	File               *string   `json:"file,omitempty"`
 	TLSVersions        *bool     `json:"tls-versions,omitempty"`
+	ALPN               *string   `json:"alpn,omitempty"`
 	ServerName         *string   `json:"servername,omitempty"`
 	StartTLS           *string   `json:"starttls,omitempty"`
 	ConnectTimeout     *Duration `json:"connect-timeout,omitempty"`
@@ -155,6 +156,9 @@ func (s *Settings) validate() error {
 	if err := validateStartTLS(s.Client.StartTLS); err != nil {
 		return fmt.Errorf("client.starttls: %w", err)
 	}
+	if err := validateALPN(s.Client.ALPN); err != nil {
+		return fmt.Errorf("client.alpn: %w", err)
+	}
 	if err := validatePositiveDuration(s.Client.ConnectTimeout); err != nil {
 		return fmt.Errorf("client.connect-timeout: %w", err)
 	}
@@ -197,6 +201,14 @@ func validateStartTLS(v *string) error {
 		return nil
 	}
 	return fmt.Errorf("must be one of %s", tlsquery.StartTLSProtocolList())
+}
+
+func validateALPN(v *string) error {
+	if v == nil {
+		return nil
+	}
+	_, err := tlsquery.ParseALPNProtocols(*v)
+	return err
 }
 
 func validateFormatVersion(v *int) error {
@@ -294,6 +306,9 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 	}
 	if c.TLSVersions != nil {
 		vals["tls-versions"] = boolStr(*c.TLSVersions)
+	}
+	if c.ALPN != nil {
+		vals["alpn"] = *c.ALPN
 	}
 	if c.ServerName != nil {
 		vals["servername"] = *c.ServerName

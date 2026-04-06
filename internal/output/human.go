@@ -64,6 +64,9 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	fmt.Fprintf(w, "  Validity: %s → %s\n",
 		notBefore.UTC().Format("2006-01-02"),
 		notAfter.UTC().Format("2006-01-02"))
+	if chain.NegotiatedTLS != nil {
+		fmt.Fprintf(w, "  Handshake: %s\n", formatHandshakeSummary(chain.NegotiatedTLS))
+	}
 
 	if len(leaf.SubjectAltNames) > 0 {
 		sans := leaf.SubjectAltNames
@@ -121,6 +124,24 @@ func (HumanRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options
 	}
 
 	return nil
+}
+
+func formatHandshakeSummary(info *tlsquery.HandshakeInfo) string {
+	if info == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, 3)
+	if info.TLSVersion != "" {
+		parts = append(parts, info.TLSVersion)
+	}
+	if info.CipherSuite != "" {
+		parts = append(parts, info.CipherSuite)
+	}
+	if info.ALPN != "" {
+		parts = append(parts, info.ALPN)
+	}
+	return strings.Join(parts, " / ")
 }
 
 func formatExpiryMsg(days int, expired bool) string {

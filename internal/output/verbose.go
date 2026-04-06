@@ -21,6 +21,14 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 		}
 		fmt.Fprintf(w, "%s Certificate verification failed: %s\n\n", color.YellowString("⚠"), reason)
 	}
+	if chain.NegotiatedTLS != nil {
+		fmt.Fprintf(w, "Negotiated TLS Version: %s\n", chain.NegotiatedTLS.TLSVersion)
+		fmt.Fprintf(w, "Negotiated Cipher Suite: %s\n", chain.NegotiatedTLS.CipherSuite)
+		if chain.NegotiatedTLS.ALPN != "" {
+			fmt.Fprintf(w, "Negotiated ALPN:       %s\n", chain.NegotiatedTLS.ALPN)
+		}
+		fmt.Fprintln(w)
+	}
 	if len(chain.TLSVersions) > 0 {
 		versions := make([]string, len(chain.TLSVersions))
 		for i, v := range chain.TLSVersions {

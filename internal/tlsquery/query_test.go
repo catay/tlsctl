@@ -49,6 +49,9 @@ func TestQuery_ValidEndpoint(t *testing.T) {
 	if chain.VerificationError == "" {
 		t.Error("expected VerificationError to be set for self-signed test certificate")
 	}
+	if chain.NegotiatedTLS == nil {
+		t.Fatal("expected negotiated tls details to be captured")
+	}
 }
 
 func TestQuery_InvalidEndpoint(t *testing.T) {
@@ -72,6 +75,32 @@ func TestResolveTimeouts_Defaults(t *testing.T) {
 	}
 	if handshakeTimeout != DefaultHandshakeTimeout {
 		t.Fatalf("handshake timeout = %v, want %v", handshakeTimeout, DefaultHandshakeTimeout)
+	}
+}
+
+func TestBuildConfig_ALPNProtocols(t *testing.T) {
+	config, err := buildConfig(QueryOptions{ALPNProtocols: []string{"h2", "http/1.1"}})
+	if err != nil {
+		t.Fatalf("buildConfig failed: %v", err)
+	}
+	if got, want := strings.Join(config.NextProtos, ","), "h2,http/1.1"; got != want {
+		t.Fatalf("NextProtos = %q, want %q", got, want)
+	}
+}
+
+func TestQuery_NegotiatedALPN(t *testing.T) {
+	server, addr := startTestTLSServerWithNextProtos(t, []string{"h2", "http/1.1"})
+	defer server.Close()
+
+	chain, err := Query(addr, QueryOptions{ALPNProtocols: []string{"h2", "http/1.1"}})
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
+	if chain.NegotiatedTLS == nil {
+		t.Fatal("expected negotiated tls details")
+	}
+	if chain.NegotiatedTLS.ALPN != "h2" {
+		t.Fatalf("expected negotiated ALPN h2, got %q", chain.NegotiatedTLS.ALPN)
 	}
 }
 
@@ -143,6 +172,10 @@ func TestCertType(t *testing.T) {
 }
 
 func startTestTLSServer(t *testing.T, clientAuth bool) (net.Listener, string) {
+	return startTestTLSServerWithNextProtos(t, nil)
+}
+
+func startTestTLSServerWithNextProtos(t *testing.T, nextProtos []string) (net.Listener, string) {
 	t.Helper()
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -179,6 +212,7 @@ func startTestTLSServer(t *testing.T, clientAuth bool) (net.Listener, string) {
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
+		NextProtos:   nextProtos,
 	}
 
 	rawListener, err := net.Listen("tcp", "127.0.0.1:0")

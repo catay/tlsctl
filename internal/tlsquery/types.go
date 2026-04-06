@@ -62,11 +62,19 @@ type TLSVersionInfo struct {
 	InsecureCipherSuites []string `json:"insecure_cipher_suites,omitempty" yaml:"insecure_cipher_suites,omitempty"`
 }
 
+// HandshakeInfo holds the negotiated TLS details for the default connection.
+type HandshakeInfo struct {
+	TLSVersion  string `json:"tls_version" yaml:"tls_version"`
+	CipherSuite string `json:"cipher_suite" yaml:"cipher_suite"`
+	ALPN        string `json:"alpn,omitempty" yaml:"alpn,omitempty"`
+}
+
 // ChainInfo holds the full certificate chain.
 type ChainInfo struct {
 	Certificates      []CertInfo       `json:"certificates" yaml:"certificates"`
 	Verified          bool             `json:"verified" yaml:"verified"`
 	VerificationError string           `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
+	NegotiatedTLS     *HandshakeInfo   `json:"negotiated_tls,omitempty" yaml:"negotiated_tls,omitempty"`
 	TLSVersions       []TLSVersionInfo `json:"tls_versions,omitempty" yaml:"tls_versions,omitempty"`
 	InputName         string           `json:"-" yaml:"-"`
 	InputLabel        string           `json:"-" yaml:"-"`
@@ -77,6 +85,7 @@ type QueryOptions struct {
 	CACertFile       string        // Path to custom CA certificate file (PEM format)
 	Proxy            string        // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
 	TLSVersions      bool          // Probe and display supported TLS versions.
+	ALPNProtocols    []string      // Advertised ALPN protocols for the TLS handshake.
 	ServerName       string        // SNI override for TLS handshake (useful when connecting by IP).
 	StartTLS         string        // STARTTLS protocol: smtp, imap, pop3, ldap.
 	ConnectTimeout   time.Duration // TCP connect timeout. Defaults to DefaultConnectTimeout when unset.

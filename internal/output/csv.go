@@ -41,6 +41,9 @@ func (CSVFullRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Opt
 func renderCSVSummary(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
 	headers := []string{
 		csvInputHeader(chains),
+		"tls_version",
+		"cipher_suite",
+		"alpn",
 		"common_name",
 		"issuer",
 		"not_before",
@@ -108,6 +111,9 @@ func csvSummaryRow(chain *tlsquery.ChainInfo, leaf *tlsquery.CertInfo, opts Opti
 
 	return []string{
 		csvInputValue(chain),
+		csvNegotiatedTLSVersion(chain),
+		csvNegotiatedCipherSuite(chain),
+		csvNegotiatedALPN(chain),
 		leaf.CommonName,
 		leaf.Issuer,
 		leaf.NotBefore,
@@ -122,7 +128,7 @@ func csvSummaryBatchRow(result TargetResult, opts Options) ([]string, error) {
 	record := csvSummaryBatchPrefix(result, opts)
 
 	if result.Result == nil {
-		return append(record, "", "", "", "", "", "", ""), nil
+		return append(record, "", "", "", "", "", "", "", "", "", ""), nil
 	}
 
 	leaf, err := result.Result.Leaf()
@@ -194,6 +200,9 @@ func renderCSVFullBatch(w io.Writer, results []TargetResult, opts Options) error
 
 func csvSummaryBatchHeaders(opts Options) []string {
 	return append(csvBatchPrefixHeaders(opts),
+		"tls_version",
+		"cipher_suite",
+		"alpn",
 		"common_name",
 		"issuer",
 		"not_before",
@@ -235,6 +244,9 @@ func csvFullHeaders(inputHeader string) []string {
 		"chain",
 		"verified",
 		"verification_error",
+		"tls_version",
+		"cipher_suite",
+		"alpn",
 		"version",
 		"serial_number",
 		"signature_algorithm",
@@ -292,6 +304,9 @@ func csvFullFieldsRow(certIndex int, chain *tlsquery.ChainInfo, cert *tlsquery.C
 		strings.Join(chain.ChainNames(), " -> "),
 		strconv.FormatBool(chain.Verified),
 		chain.VerificationError,
+		csvNegotiatedTLSVersion(chain),
+		csvNegotiatedCipherSuite(chain),
+		csvNegotiatedALPN(chain),
 		strconv.Itoa(cert.Version),
 		cert.SerialNumber,
 		cert.SignatureAlgorithm,
@@ -362,6 +377,27 @@ func csvInputValue(chain *tlsquery.ChainInfo) string {
 
 func csvJoin(values []string) string {
 	return strings.Join(values, "; ")
+}
+
+func csvNegotiatedTLSVersion(chain *tlsquery.ChainInfo) string {
+	if chain == nil || chain.NegotiatedTLS == nil {
+		return ""
+	}
+	return chain.NegotiatedTLS.TLSVersion
+}
+
+func csvNegotiatedCipherSuite(chain *tlsquery.ChainInfo) string {
+	if chain == nil || chain.NegotiatedTLS == nil {
+		return ""
+	}
+	return chain.NegotiatedTLS.CipherSuite
+}
+
+func csvNegotiatedALPN(chain *tlsquery.ChainInfo) string {
+	if chain == nil || chain.NegotiatedTLS == nil {
+		return ""
+	}
+	return chain.NegotiatedTLS.ALPN
 }
 
 func csvTLSVersions(versions []tlsquery.TLSVersionInfo) string {

@@ -18,6 +18,11 @@ func testChains() []*tlsquery.ChainInfo {
 			InputName:  "a.example.com:443",
 			InputLabel: "target",
 			Verified:   true,
+			NegotiatedTLS: &tlsquery.HandshakeInfo{
+				TLSVersion:  "TLS 1.3",
+				CipherSuite: "TLS_AES_128_GCM_SHA256",
+				ALPN:        "h2",
+			},
 			Certificates: []tlsquery.CertInfo{
 				{
 					Type:       "leaf",
@@ -34,6 +39,10 @@ func testChains() []*tlsquery.ChainInfo {
 			InputName:  "b.example.com:443",
 			InputLabel: "target",
 			Verified:   true,
+			NegotiatedTLS: &tlsquery.HandshakeInfo{
+				TLSVersion:  "TLS 1.2",
+				CipherSuite: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			},
 			Certificates: []tlsquery.CertInfo{
 				{
 					Type:       "leaf",
@@ -260,11 +269,17 @@ func TestRenderTargetResults_MultiCSVLegacy(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected header plus one successful row, got %d rows", len(rows))
 	}
-	if rows[0][0] != "target" || rows[0][1] != "common_name" {
+	if rows[0][0] != "target" || rows[0][1] != "tls_version" {
 		t.Fatalf("unexpected legacy CSV headers: %v", rows[0][:2])
+	}
+	if rows[0][1] != "tls_version" || rows[0][2] != "cipher_suite" || rows[0][3] != "alpn" || rows[0][4] != "common_name" {
+		t.Fatalf("unexpected legacy CSV negotiated tls headers: %v", rows[0][:5])
 	}
 	if rows[1][0] != "a.example.com:443" {
 		t.Fatalf("unexpected successful CSV row: %v", rows[1])
+	}
+	if rows[1][1] != "TLS 1.3" || rows[1][2] != "TLS_AES_128_GCM_SHA256" || rows[1][3] != "h2" {
+		t.Fatalf("unexpected negotiated tls values in successful CSV row: %v", rows[1][:4])
 	}
 }
 
@@ -320,10 +335,19 @@ func TestRenderTargetResults_MultiCSVBatchV2(t *testing.T) {
 	if rows[0][0] != "target" || rows[0][1] != "status" || rows[0][2] != "tls_status" || rows[0][3] != "error" {
 		t.Fatalf("unexpected CSV v2 headers: %v", rows[0][:4])
 	}
+	if rows[0][4] != "tls_version" || rows[0][5] != "cipher_suite" || rows[0][6] != "alpn" {
+		t.Fatalf("unexpected CSV v2 negotiated tls headers: %v", rows[0][:7])
+	}
 	if rows[1][0] != "a.example.com:443" || rows[1][1] != "success" || rows[1][2] != "secure" || rows[1][3] != "" {
 		t.Fatalf("unexpected success row: %v", rows[1][:4])
 	}
+	if rows[1][4] != "TLS 1.3" || rows[1][5] != "TLS_AES_128_GCM_SHA256" || rows[1][6] != "h2" {
+		t.Fatalf("unexpected negotiated tls values in success row: %v", rows[1][:7])
+	}
 	if rows[2][0] != "missing.example.com:443" || rows[2][1] != "failure" || rows[2][2] != "" || rows[2][3] != "connection failed" {
 		t.Fatalf("unexpected failed row: %v", rows[2][:4])
+	}
+	if rows[2][4] != "" || rows[2][5] != "" || rows[2][6] != "" {
+		t.Fatalf("expected empty negotiated tls values in failed row: %v", rows[2][:7])
 	}
 }

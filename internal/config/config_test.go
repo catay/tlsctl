@@ -115,6 +115,19 @@ func TestLoad_InvalidStartTLS(t *testing.T) {
 	}
 }
 
+func TestLoad_InvalidALPN(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"client": {"alpn": "h2,,http/1.1"}}`), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	_, err := Load(path, false)
+	if err == nil {
+		t.Fatal("expected error for invalid alpn")
+	}
+}
+
 func TestLoad_InvalidFormatVersion(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
@@ -165,6 +178,7 @@ func TestLoad_ValidConfig(t *testing.T) {
 			"format-version": 2,
 			"proxy": "http://proxy:8080",
 			"tls-versions": true,
+			"alpn": "h2,http/1.1",
 			"connect-timeout": "4s",
 			"handshake-timeout": "9s",
 			"revocation": "ocsp",
@@ -216,6 +230,9 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if s.Client.TLSVersions == nil || !*s.Client.TLSVersions {
 		t.Error("expected client.tls-versions = true")
 	}
+	if s.Client.ALPN == nil || *s.Client.ALPN != "h2,http/1.1" {
+		t.Error("expected client.alpn = h2,http/1.1")
+	}
 	if s.Client.ConnectTimeout == nil || s.Client.ConnectTimeout.Duration != 4*time.Second {
 		t.Error("expected client.connect-timeout = 4s")
 	}
@@ -242,6 +259,7 @@ func TestFlagValues_Client(t *testing.T) {
 	expiry := 21
 	output := "json"
 	formatVersion := 2
+	alpn := "h2,http/1.1"
 	connectTimeout := Duration{Duration: 4 * time.Second}
 	handshakeTimeout := Duration{Duration: 9 * time.Second}
 	s := &Settings{
@@ -249,6 +267,7 @@ func TestFlagValues_Client(t *testing.T) {
 			ExpiryWarning:    &expiry,
 			Output:           &output,
 			FormatVersion:    &formatVersion,
+			ALPN:             &alpn,
 			ConnectTimeout:   &connectTimeout,
 			HandshakeTimeout: &handshakeTimeout,
 		},
@@ -263,6 +282,9 @@ func TestFlagValues_Client(t *testing.T) {
 	}
 	if vals["format-version"] != "2" {
 		t.Errorf("expected format-version=2, got %s", vals["format-version"])
+	}
+	if vals["alpn"] != "h2,http/1.1" {
+		t.Errorf("expected alpn=h2,http/1.1, got %s", vals["alpn"])
 	}
 	if vals["connect-timeout"] != "4s" {
 		t.Errorf("expected connect-timeout=4s, got %s", vals["connect-timeout"])

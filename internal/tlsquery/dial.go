@@ -9,20 +9,20 @@ import (
 	"time"
 )
 
-func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) ([]*x509.Certificate, error) {
+func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) ([]*x509.Certificate, *HandshakeInfo, error) {
 	conn, err := dialTLS(endpoint, proxyURL, config, connectTimeout, handshakeTimeout, startTLSProto)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer conn.Close()
 
 	state := conn.ConnectionState()
 	certs := state.PeerCertificates
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("no certificate returned by server")
+		return nil, nil, fmt.Errorf("no certificate returned by server")
 	}
 
-	return certs, nil
+	return certs, negotiatedHandshakeInfo(state), nil
 }
 
 // tlsVersionName returns the human-readable name for a TLS version constant.
@@ -38,6 +38,14 @@ func tlsVersionName(v uint16) string {
 		return "TLS 1.3"
 	default:
 		return fmt.Sprintf("0x%04x", v)
+	}
+}
+
+func negotiatedHandshakeInfo(state tls.ConnectionState) *HandshakeInfo {
+	return &HandshakeInfo{
+		TLSVersion:  tlsVersionName(state.Version),
+		CipherSuite: tls.CipherSuiteName(state.CipherSuite),
+		ALPN:        state.NegotiatedProtocol,
 	}
 }
 

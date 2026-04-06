@@ -1,7 +1,16 @@
 package tlsquery
 
 import (
+	"time"
+
 	"github.com/catay/tlsctl/internal/revocation"
+)
+
+const (
+	// DefaultConnectTimeout bounds the TCP connect phase for client queries.
+	DefaultConnectTimeout = 5 * time.Second
+	// DefaultHandshakeTimeout bounds proxy negotiation, STARTTLS, and TLS handshakes.
+	DefaultHandshakeTimeout = 10 * time.Second
 )
 
 // CertInfo holds the extracted certificate metadata.
@@ -65,9 +74,11 @@ type ChainInfo struct {
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	CACertFile  string // Path to custom CA certificate file (PEM format)
-	Proxy       string // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
-	TLSVersions bool   // Probe and display supported TLS versions.
-	ServerName  string // SNI override for TLS handshake (useful when connecting by IP).
-	StartTLS    string // STARTTLS protocol: smtp, imap, pop3, ldap.
+	CACertFile       string        // Path to custom CA certificate file (PEM format)
+	Proxy            string        // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
+	TLSVersions      bool          // Probe and display supported TLS versions.
+	ServerName       string        // SNI override for TLS handshake (useful when connecting by IP).
+	StartTLS         string        // STARTTLS protocol: smtp, imap, pop3, ldap.
+	ConnectTimeout   time.Duration // TCP connect timeout. Defaults to DefaultConnectTimeout when unset.
+	HandshakeTimeout time.Duration // Proxy negotiation, STARTTLS, and TLS handshake timeout. Defaults to DefaultHandshakeTimeout when unset.
 }

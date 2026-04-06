@@ -65,6 +65,49 @@ func TestQuery_ConnectionRefused(t *testing.T) {
 	}
 }
 
+func TestResolveTimeouts_Defaults(t *testing.T) {
+	connectTimeout, handshakeTimeout := resolveTimeouts(QueryOptions{})
+	if connectTimeout != DefaultConnectTimeout {
+		t.Fatalf("connect timeout = %v, want %v", connectTimeout, DefaultConnectTimeout)
+	}
+	if handshakeTimeout != DefaultHandshakeTimeout {
+		t.Fatalf("handshake timeout = %v, want %v", handshakeTimeout, DefaultHandshakeTimeout)
+	}
+}
+
+func TestQuery_HandshakeTimeout(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+	defer listener.Close()
+
+	done := make(chan struct{})
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			close(done)
+			return
+		}
+		defer conn.Close()
+		time.Sleep(250 * time.Millisecond)
+		close(done)
+	}()
+
+	start := time.Now()
+	_, err = Query(listener.Addr().String(), QueryOptions{HandshakeTimeout: 50 * time.Millisecond})
+	if err == nil {
+		t.Fatal("expected handshake timeout error")
+	}
+	if !strings.Contains(err.Error(), "i/o timeout") {
+		t.Fatalf("expected timeout error, got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("query took too long: %v", elapsed)
+	}
+	<-done
+}
+
 func TestCertType(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -354,7 +397,7 @@ func TestQuery_ViaProxyAuthRequired(t *testing.T) {
 
 func TestDialViaProxy_ConnectFailed(t *testing.T) {
 	proxyURL, _ := url.Parse("http://127.0.0.1:1")
-	_, err := dialViaProxy("example.com:443", proxyURL, 2*time.Second)
+	_, err := dialViaProxy("example.com:443", proxyURL, 2*time.Second, 2*time.Second)
 	if err == nil {
 		t.Error("expected error connecting to non-existent proxy")
 	}
@@ -383,7 +426,7 @@ func TestDialViaProxy_ProxyRejectsConnect(t *testing.T) {
 	}()
 
 	proxyURL, _ := url.Parse("http://" + listener.Addr().String())
-	_, err = dialViaProxy("example.com:443", proxyURL, 5*time.Second)
+	_, err = dialViaProxy("example.com:443", proxyURL, 5*time.Second, 5*time.Second)
 	if err == nil {
 		t.Error("expected error for rejected CONNECT")
 	}

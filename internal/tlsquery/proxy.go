@@ -35,7 +35,7 @@ func resolveProxy(endpoint string, opts QueryOptions) (*url.URL, error) {
 	return http.ProxyFromEnvironment(req)
 }
 
-func dialViaProxy(endpoint string, proxyURL *url.URL, timeout time.Duration) (net.Conn, error) {
+func dialViaProxy(endpoint string, proxyURL *url.URL, connectTimeout, handshakeTimeout time.Duration) (net.Conn, error) {
 	proxyAddr := proxyURL.Host
 	if _, _, err := net.SplitHostPort(proxyAddr); err != nil {
 		port := "8080"
@@ -45,10 +45,14 @@ func dialViaProxy(endpoint string, proxyURL *url.URL, timeout time.Duration) (ne
 		proxyAddr = net.JoinHostPort(proxyAddr, port)
 	}
 
-	dialer := &net.Dialer{Timeout: timeout}
+	dialer := &net.Dialer{Timeout: connectTimeout}
 	conn, err := dialer.Dial("tcp", proxyAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to proxy %s: %w", proxyAddr, err)
+	}
+	if err := conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to configure proxy timeout: %w", err)
 	}
 
 	if proxyURL.Scheme == "https" {
@@ -91,6 +95,10 @@ func dialViaProxy(endpoint string, proxyURL *url.URL, timeout time.Duration) (ne
 	if resp.StatusCode != http.StatusOK {
 		conn.Close()
 		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+	}
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to clear proxy timeout: %w", err)
 	}
 
 	return &bufferedConn{Conn: conn, r: br}, nil

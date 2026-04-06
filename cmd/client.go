@@ -25,10 +25,20 @@ type revocationFlags struct {
 	softFail bool
 }
 
+type connectionFlags struct {
+	connectTimeout   time.Duration
+	handshakeTimeout time.Duration
+}
+
 func addRevocationFlags(cmd *cobra.Command, rf *revocationFlags) {
 	cmd.Flags().StringVar(&rf.mode, "revocation", "", "Revocation check mode: crl, ocsp")
 	cmd.Flags().DurationVar(&rf.timeout, "revocation-timeout", 5*time.Second, "Timeout for revocation checks")
 	cmd.Flags().BoolVar(&rf.softFail, "revocation-soft-fail", true, "Treat revocation check errors as unknown (soft-fail)")
+}
+
+func addConnectionFlags(cmd *cobra.Command, cf *connectionFlags) {
+	cmd.Flags().DurationVar(&cf.connectTimeout, "connect-timeout", tlsquery.DefaultConnectTimeout, "Timeout for establishing the TCP connection")
+	cmd.Flags().DurationVar(&cf.handshakeTimeout, "handshake-timeout", tlsquery.DefaultHandshakeTimeout, "Timeout for proxy negotiation, STARTTLS, and the TLS handshake")
 }
 
 func validateRevocationMode(mode string) error {
@@ -43,6 +53,16 @@ func validateRevocationMode(mode string) error {
 	}
 }
 
+func validateConnectionTimeouts(cf connectionFlags) error {
+	if cf.connectTimeout <= 0 {
+		return fmt.Errorf("--connect-timeout must be greater than 0")
+	}
+	if cf.handshakeTimeout <= 0 {
+		return fmt.Errorf("--handshake-timeout must be greater than 0")
+	}
+	return nil
+}
+
 func newClientCmd(rt *Runtime) *cobra.Command {
 	var outputFormat string
 	var formatVersion int
@@ -53,6 +73,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	var serverName string
 	var startTLS string
 	var rf revocationFlags
+	var cf connectionFlags
 
 	cmd := &cobra.Command{
 		Use:   "client FQDN[:PORT] [FQDN[:PORT]...]",
@@ -74,6 +95,9 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			if err := validateRevocationMode(rf.mode); err != nil {
 				return err
 			}
+			if err := validateConnectionTimeouts(cf); err != nil {
+				return err
+			}
 			if err := validateOutputFormatVersion(output.Format(outputFormat), formatVersion); err != nil {
 				return err
 			}
@@ -88,11 +112,13 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 			}
 
 			opts := tlsquery.QueryOptions{
-				CACertFile:  caCertFile,
-				Proxy:       proxyURL,
-				TLSVersions: tlsVersions,
-				ServerName:  serverName,
-				StartTLS:    startTLS,
+				CACertFile:       caCertFile,
+				Proxy:            proxyURL,
+				TLSVersions:      tlsVersions,
+				ServerName:       serverName,
+				StartTLS:         startTLS,
+				ConnectTimeout:   cf.connectTimeout,
+				HandshakeTimeout: cf.handshakeTimeout,
 			}
 
 			now := rt.NowFunc()
@@ -149,6 +175,7 @@ func newClientCmd(rt *Runtime) *cobra.Command {
 	cmd.Flags().StringVar(&serverName, "servername", "", "Override the SNI server name sent in the TLS handshake")
 	cmd.Flags().StringVar(&startTLS, "starttls", "", "Use STARTTLS for the given protocol: "+tlsquery.StartTLSProtocolList())
 	addRevocationFlags(cmd, &rf)
+	addConnectionFlags(cmd, &cf)
 	addCertFlags(cmd)
 
 	return cmd

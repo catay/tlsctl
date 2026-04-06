@@ -43,6 +43,8 @@ type GlobalSettings struct {
 	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
 	Output             *string   `json:"output,omitempty"`
 	CACert             *string   `json:"cacert,omitempty"`
+	ConnectTimeout     *Duration `json:"connect-timeout,omitempty"`
+	HandshakeTimeout   *Duration `json:"handshake-timeout,omitempty"`
 	Revocation         *string   `json:"revocation,omitempty"`
 	RevocationTimeout  *Duration `json:"revocation-timeout,omitempty"`
 	RevocationSoftFail *bool     `json:"revocation-soft-fail,omitempty"`
@@ -61,6 +63,8 @@ type ClientSettings struct {
 	TLSVersions        *bool     `json:"tls-versions,omitempty"`
 	ServerName         *string   `json:"servername,omitempty"`
 	StartTLS           *string   `json:"starttls,omitempty"`
+	ConnectTimeout     *Duration `json:"connect-timeout,omitempty"`
+	HandshakeTimeout   *Duration `json:"handshake-timeout,omitempty"`
 	Revocation         *string   `json:"revocation,omitempty"`
 	RevocationTimeout  *Duration `json:"revocation-timeout,omitempty"`
 	RevocationSoftFail *bool     `json:"revocation-soft-fail,omitempty"`
@@ -127,6 +131,12 @@ func (s *Settings) validate() error {
 	if err := validateRevocationMode(s.Global.Revocation); err != nil {
 		return fmt.Errorf("global.revocation: %w", err)
 	}
+	if err := validatePositiveDuration(s.Global.ConnectTimeout); err != nil {
+		return fmt.Errorf("global.connect-timeout: %w", err)
+	}
+	if err := validatePositiveDuration(s.Global.HandshakeTimeout); err != nil {
+		return fmt.Errorf("global.handshake-timeout: %w", err)
+	}
 	if err := validateExpiryWarning(s.Client.ExpiryWarning); err != nil {
 		return fmt.Errorf("client.expiry-warning: %w", err)
 	}
@@ -144,6 +154,12 @@ func (s *Settings) validate() error {
 	}
 	if err := validateStartTLS(s.Client.StartTLS); err != nil {
 		return fmt.Errorf("client.starttls: %w", err)
+	}
+	if err := validatePositiveDuration(s.Client.ConnectTimeout); err != nil {
+		return fmt.Errorf("client.connect-timeout: %w", err)
+	}
+	if err := validatePositiveDuration(s.Client.HandshakeTimeout); err != nil {
+		return fmt.Errorf("client.handshake-timeout: %w", err)
 	}
 	return nil
 }
@@ -193,6 +209,16 @@ func validateFormatVersion(v *int) error {
 	return nil
 }
 
+func validatePositiveDuration(v *Duration) error {
+	if v == nil {
+		return nil
+	}
+	if v.Duration <= 0 {
+		return fmt.Errorf("must be greater than 0")
+	}
+	return nil
+}
+
 // FlagValues returns a map of flag-name to string-value for the given
 // subcommand section. Only non-nil fields are included.
 func (s *Settings) FlagValues(subcommand string) map[string]string {
@@ -213,6 +239,12 @@ func (s *Settings) FlagValues(subcommand string) map[string]string {
 	}
 	if s.Global.CACert != nil {
 		vals["cacert"] = *s.Global.CACert
+	}
+	if s.Global.ConnectTimeout != nil {
+		vals["connect-timeout"] = s.Global.ConnectTimeout.String()
+	}
+	if s.Global.HandshakeTimeout != nil {
+		vals["handshake-timeout"] = s.Global.HandshakeTimeout.String()
 	}
 	if s.Global.Revocation != nil {
 		vals["revocation"] = *s.Global.Revocation
@@ -268,6 +300,12 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 	}
 	if c.StartTLS != nil {
 		vals["starttls"] = *c.StartTLS
+	}
+	if c.ConnectTimeout != nil {
+		vals["connect-timeout"] = c.ConnectTimeout.String()
+	}
+	if c.HandshakeTimeout != nil {
+		vals["handshake-timeout"] = c.HandshakeTimeout.String()
 	}
 	if c.Revocation != nil {
 		vals["revocation"] = *c.Revocation

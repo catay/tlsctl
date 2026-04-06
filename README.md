@@ -531,6 +531,23 @@ tlsctl client --starttls pop3 mail.example.com
 tlsctl client --starttls ldap ldap.example.com
 ```
 
+### Connection timeout controls
+
+Use `--connect-timeout` and `--handshake-timeout` to bound client-side network time for direct TLS, proxy CONNECT, and STARTTLS flows.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--connect-timeout` | `5s` | Timeout for establishing the TCP connection |
+| `--handshake-timeout` | `10s` | Timeout for proxy negotiation, STARTTLS, and the TLS handshake |
+
+```bash
+# Faster failure for monitoring and inventory scans
+tlsctl client --connect-timeout 3s --handshake-timeout 5s example.com
+
+# Allow more time for slow STARTTLS services
+tlsctl client --starttls smtp --handshake-timeout 15s mail.example.com
+```
+
 ### Parsing PEM files
 
 ```bash
@@ -678,6 +695,8 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
     "expiry-warning": 30,
     "output": "json",
     "cacert": "/etc/ssl/certs/ca.pem",
+    "connect-timeout": "5s",
+    "handshake-timeout": "10s",
     "revocation": "ocsp",
     "revocation-timeout": "10s",
     "revocation-soft-fail": true
@@ -688,6 +707,8 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
     "format-version": 2,
     "proxy": "http://proxy:8080",
     "tls-versions": true,
+    "connect-timeout": "3s",
+    "handshake-timeout": "6s",
     "revocation-soft-fail": false
   },
   "pem": {
@@ -697,7 +718,7 @@ If the default configuration file is missing, `tlsctl` runs with built-in defaul
 }
 ```
 
-The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version` for versioned `json`, `yaml`, `csv`, and `csv-full` output. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
+The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `connect-timeout`, `handshake-timeout`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version`, `proxy`, `file`, `tls-versions`, `servername`, and `starttls` for client-specific behavior. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
 
 Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
 

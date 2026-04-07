@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +65,11 @@ example.org:8443 # inline comment
 			args:    []string{"example.com:abc"},
 			wantErr: true,
 		},
+		{
+			name:    "reject URL input",
+			args:    []string{"https://example.com"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -72,6 +78,9 @@ example.org:8443 # inline comment
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
+				}
+				if len(tt.args) == 1 && strings.Contains(tt.args[0], "://") && !strings.Contains(err.Error(), "expected host[:port], not a URL") {
+					t.Fatalf("expected concise URL error, got %v", err)
 				}
 				return
 			}

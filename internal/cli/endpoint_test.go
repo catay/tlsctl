@@ -82,6 +82,36 @@ func TestNormalizeEndpoint(t *testing.T) {
 			endpoint: "[2001:db8::1]:8443",
 			want:     "[2001:db8::1]:8443",
 		},
+		{
+			name:      "reject URL scheme",
+			endpoint:  "https://example.com",
+			wantError: true,
+			errorMsg:  "expected host[:port], not a URL",
+		},
+		{
+			name:      "reject path",
+			endpoint:  "example.com/path",
+			wantError: true,
+			errorMsg:  "expected host[:port], not a URL",
+		},
+		{
+			name:      "reject query",
+			endpoint:  "example.com?foo=bar",
+			wantError: true,
+			errorMsg:  "expected host[:port], not a URL",
+		},
+		{
+			name:      "reject fragment",
+			endpoint:  "example.com#anchor",
+			wantError: true,
+			errorMsg:  "expected host[:port], not a URL",
+		},
+		{
+			name:      "reject userinfo",
+			endpoint:  "user@example.com",
+			wantError: true,
+			errorMsg:  "expected host[:port], not a URL",
+		},
 	}
 
 	for _, tt := range tests {

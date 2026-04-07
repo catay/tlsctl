@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/catay/tlsctl/internal/tlsquery"
 )
@@ -12,6 +13,10 @@ import (
 // An optional startTLSProto can be provided to select the default port
 // for STARTTLS protocols (smtp=587, imap=143, pop3=110, ldap=389).
 func NormalizeEndpoint(endpoint string, startTLSProto ...string) (string, error) {
+	if looksLikeURL(endpoint) {
+		return "", fmt.Errorf("expected host[:port], not a URL")
+	}
+
 	host, port, err := net.SplitHostPort(endpoint)
 	if err != nil {
 		host = endpoint
@@ -32,6 +37,13 @@ func NormalizeEndpoint(endpoint string, startTLSProto ...string) (string, error)
 	}
 
 	return net.JoinHostPort(host, port), nil
+}
+
+func looksLikeURL(endpoint string) bool {
+	if strings.Contains(endpoint, "://") {
+		return true
+	}
+	return strings.ContainsAny(endpoint, "/?#@")
 }
 
 func defaultPort(startTLSProto ...string) string {

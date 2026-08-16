@@ -6,7 +6,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-asn1-ber/asn1-ber v1.5.8
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.55.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

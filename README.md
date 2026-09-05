@@ -10,10 +10,6 @@ Inspect TLS certificates from endpoints, PEM files, or stdin. See certificate
 trust, expiry, revocation, and negotiated TLS details in your terminal, or export
 the same results as JSON, YAML, or CSV.
 
-**Release preparation:** This README targets 2.0.0. The versioned downloads and
-Docker images below become available after the separately approved release is
-published.
-
 **Upgrading from 1.x?** Version 2.0.0 changes structured output for both `client`
 and `pem` and removes `--format-version`. Read the
 [migration notes](#migrating-from-1x) before updating scripts.
@@ -436,11 +432,6 @@ The full `make` target requires `golangci-lint` v2.11 or later, built with a
 compatible Go toolchain. Snapshot releases additionally require GoReleaser v2
 and Docker with Buildx. Release workflows validate before tagging and can resume
 publication for a tag pointing at the same commit.
-
-The implementation and release use separate PRs. Merging implementation changes
-does not publish a release; the separately approved `chore: bump version to 2.0.0`
-PR updates `VERSION` and triggers release publication. The README's installation
-examples already target 2.0.0.
 
 ## License
 

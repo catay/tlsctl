@@ -3,7 +3,6 @@ package output
 import (
 	"io"
 
-	"github.com/catay/tlsctl/v2/internal/revocation"
 	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
@@ -34,24 +33,17 @@ type Summary struct {
 }
 
 type BatchEnvelope struct {
-	Status  ResultStatus    `json:"status" yaml:"status"`
-	Summary Summary         `json:"summary" yaml:"summary"`
-	Results []BatchResultV2 `json:"results" yaml:"results"`
+	Status  ResultStatus  `json:"status" yaml:"status"`
+	Summary Summary       `json:"summary" yaml:"summary"`
+	Results []BatchResult `json:"results" yaml:"results"`
 }
 
-type BatchResultV2 struct {
+type BatchResult struct {
 	Target    string              `json:"target" yaml:"target"`
 	Status    ResultStatus        `json:"status" yaml:"status"`
 	TLSStatus TLSStatus           `json:"tls_status,omitempty" yaml:"tls_status,omitempty"`
 	Error     string              `json:"error,omitempty" yaml:"error,omitempty"`
 	Result    *tlsquery.ChainInfo `json:"result,omitempty" yaml:"result,omitempty"`
-}
-
-type batchResultV1 struct {
-	Target string              `json:"target" yaml:"target"`
-	OK     bool                `json:"ok" yaml:"ok"`
-	Error  string              `json:"error,omitempty" yaml:"error,omitempty"`
-	Result *tlsquery.ChainInfo `json:"result,omitempty" yaml:"result,omitempty"`
 }
 
 // BatchRenderer renders per-target results, including failed targets.
@@ -70,37 +62,7 @@ func (r TargetResult) TLSStatus(opts Options) TLSStatus {
 	if r.Error != "" || r.Result == nil {
 		return ""
 	}
-	leaf, err := r.Result.Leaf()
-	if err != nil {
-		return ""
-	}
-
-	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusError {
-		return TLSStatusRevocationError
-	}
-	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusRevoked {
-		return TLSStatusInsecure
-	}
-	if !r.Result.Verified {
-		return TLSStatusInsecure
-	}
-
-	notAfter, err := leaf.NotAfterTime()
-	if err != nil {
-		return ""
-	}
-	if opts.NowFunc().After(notAfter) {
-		return TLSStatusInsecure
-	}
-	daysUntilExpiry := int(notAfter.Sub(opts.NowFunc()).Hours() / 24)
-	if daysUntilExpiry <= opts.WarningDays() {
-		return TLSStatusExpiring
-	}
-	return TLSStatusSecure
-}
-
-func (r TargetResult) OK() bool {
-	return r.Error == ""
+	return TLSStatus(r.Result.Health(opts.NowFunc(), opts.WarningDays()).Status)
 }
 
 func (r TargetResult) WithoutPEM() TargetResult {
@@ -119,27 +81,13 @@ func cleanTargetResults(results []TargetResult) []TargetResult {
 	return clean
 }
 
-func toBatchResultsV1(results []TargetResult) []batchResultV1 {
-	clean := cleanTargetResults(results)
-	out := make([]batchResultV1, len(clean))
-	for i, result := range clean {
-		out[i] = batchResultV1{
-			Target: result.Target,
-			OK:     result.OK(),
-			Error:  result.Error,
-			Result: result.Result,
-		}
-	}
-	return out
-}
-
-func toBatchEnvelopeV2(results []TargetResult, opts Options) BatchEnvelope {
+func toBatchEnvelope(results []TargetResult, opts Options) BatchEnvelope {
 	clean := cleanTargetResults(results)
 	out := BatchEnvelope{
 		Summary: Summary{
 			Total: len(clean),
 		},
-		Results: make([]BatchResultV2, len(clean)),
+		Results: make([]BatchResult, len(clean)),
 	}
 
 	for i, result := range clean {
@@ -150,7 +98,7 @@ func toBatchEnvelopeV2(results []TargetResult, opts Options) BatchEnvelope {
 			out.Summary.Failed++
 		}
 
-		out.Results[i] = BatchResultV2{
+		out.Results[i] = BatchResult{
 			Target:    result.Target,
 			Status:    status,
 			TLSStatus: result.TLSStatus(opts),

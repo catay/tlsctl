@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catay/tlsctl/v2/internal/revocation"
 	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
@@ -68,40 +67,16 @@ func updateExitCodeForChain(tracker *ExitTracker, chain *tlsquery.ChainInfo, now
 	if chain == nil || tracker == nil {
 		return
 	}
-	leaf, err := chain.Leaf()
-	if err != nil {
-		return
-	}
-
-	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusError {
-		tracker.Set(ExitRevocationError)
-		return
-	}
-
-	if leaf.Revocation != nil && leaf.Revocation.OverallStatus == revocation.StatusRevoked {
-		tracker.Set(ExitInsecure)
-		return
-	}
-
-	if !chain.Verified {
-		tracker.Set(ExitInsecure)
-		return
-	}
-
-	notAfter, err := leaf.NotAfterTime()
-	if err != nil {
-		return
-	}
-	if now.After(notAfter) {
-		tracker.Set(ExitInsecure)
-		return
-	}
 	threshold := 30
-	if len(warningDays) > 0 && warningDays[0] > 0 {
+	if len(warningDays) > 0 {
 		threshold = warningDays[0]
 	}
-	daysUntilExpiry := int(notAfter.Sub(now).Hours() / 24)
-	if daysUntilExpiry <= threshold {
+	switch chain.Health(now, threshold).Status {
+	case "insecure":
+		tracker.Set(ExitInsecure)
+	case "revocation_error":
+		tracker.Set(ExitRevocationError)
+	case "expiring":
 		tracker.Set(ExitExpiring)
 	}
 }

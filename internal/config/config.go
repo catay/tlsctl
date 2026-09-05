@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/catay/tlsctl/v2/internal/output"
 	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
@@ -52,11 +54,12 @@ type GlobalSettings struct {
 
 // ClientSettings holds settings for the client subcommand.
 type ClientSettings struct {
+	Concurrency        *int      `json:"concurrency,omitempty"`
+	Timeout            *Duration `json:"timeout,omitempty"`
 	NoColor            *bool     `json:"no-color,omitempty"`
 	Quiet              *bool     `json:"quiet,omitempty"`
 	ExpiryWarning      *int      `json:"expiry-warning,omitempty"`
 	Output             *string   `json:"output,omitempty"`
-	FormatVersion      *int      `json:"format-version,omitempty"`
 	CACert             *string   `json:"cacert,omitempty"`
 	Proxy              *string   `json:"proxy,omitempty"`
 	File               *string   `json:"file,omitempty"`
@@ -118,6 +121,10 @@ func Load(path string, explicit bool) (*Settings, error) {
 		return nil, fmt.Errorf("invalid config file %s: %w", path, err)
 	}
 
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("invalid config file %s: expected a single JSON document", path)
+	}
+
 	if err := s.validate(); err != nil {
 		return nil, fmt.Errorf("invalid config file %s: %w", path, err)
 	}
@@ -126,6 +133,31 @@ func Load(path string, explicit bool) (*Settings, error) {
 }
 
 func (s *Settings) validate() error {
+	for _, section := range []struct {
+		name    string
+		format  *string
+		timeout *Duration
+	}{
+		{"global", s.Global.Output, s.Global.RevocationTimeout},
+		{"client", s.Client.Output, s.Client.RevocationTimeout},
+		{"pem", s.Pem.Output, s.Pem.RevocationTimeout},
+	} {
+		if section.format != nil {
+			if _, err := output.New(output.Format(*section.format)); err != nil {
+				return fmt.Errorf("%s.output: %w", section.name, err)
+			}
+		}
+		if err := validatePositiveDuration(section.timeout); err != nil {
+			return fmt.Errorf("%s.revocation-timeout: %w", section.name, err)
+		}
+	}
+	if s.Client.Concurrency != nil && (*s.Client.Concurrency < 1 || *s.Client.Concurrency > 256) {
+		return fmt.Errorf("client.concurrency: must be between 1 and 256")
+	}
+	if err := validatePositiveDuration(s.Client.Timeout); err != nil {
+		return fmt.Errorf("client.timeout: %w", err)
+	}
+
 	if err := validateExpiryWarning(s.Global.ExpiryWarning); err != nil {
 		return fmt.Errorf("global.expiry-warning: %w", err)
 	}
@@ -141,9 +173,6 @@ func (s *Settings) validate() error {
 	if err := validateExpiryWarning(s.Client.ExpiryWarning); err != nil {
 		return fmt.Errorf("client.expiry-warning: %w", err)
 	}
-	if err := validateFormatVersion(s.Client.FormatVersion); err != nil {
-		return fmt.Errorf("client.format-version: %w", err)
-	}
 	if err := validateExpiryWarning(s.Pem.ExpiryWarning); err != nil {
 		return fmt.Errorf("pem.expiry-warning: %w", err)
 	}
@@ -158,6 +187,11 @@ func (s *Settings) validate() error {
 	}
 	if err := validateALPN(s.Client.ALPN); err != nil {
 		return fmt.Errorf("client.alpn: %w", err)
+	}
+	if s.Client.Proxy != nil {
+		if err := tlsquery.ValidateProxy(*s.Client.Proxy); err != nil {
+			return fmt.Errorf("client.proxy: %w", err)
+		}
 	}
 	if err := validatePositiveDuration(s.Client.ConnectTimeout); err != nil {
 		return fmt.Errorf("client.connect-timeout: %w", err)
@@ -209,16 +243,6 @@ func validateALPN(v *string) error {
 	}
 	_, err := tlsquery.ParseALPNProtocols(*v)
 	return err
-}
-
-func validateFormatVersion(v *int) error {
-	if v == nil {
-		return nil
-	}
-	if *v < 1 || *v > 2 {
-		return fmt.Errorf("must be 1 or 2")
-	}
-	return nil
 }
 
 func validatePositiveDuration(v *Duration) error {
@@ -280,6 +304,12 @@ func (s *Settings) FlagValues(subcommand string) map[string]string {
 }
 
 func addClientFlags(vals map[string]string, c *ClientSettings) {
+	if c.Concurrency != nil {
+		vals["concurrency"] = fmt.Sprint(*c.Concurrency)
+	}
+	if c.Timeout != nil {
+		vals["timeout"] = c.Timeout.String()
+	}
 	if c.NoColor != nil {
 		vals["no-color"] = boolStr(*c.NoColor)
 	}
@@ -291,9 +321,6 @@ func addClientFlags(vals map[string]string, c *ClientSettings) {
 	}
 	if c.Output != nil {
 		vals["output"] = *c.Output
-	}
-	if c.FormatVersion != nil {
-		vals["format-version"] = fmt.Sprintf("%d", *c.FormatVersion)
 	}
 	if c.CACert != nil {
 		vals["cacert"] = *c.CACert

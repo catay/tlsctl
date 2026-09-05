@@ -2,35 +2,20 @@ package output
 
 import (
 	"encoding/json"
-	"io"
-
 	"github.com/catay/tlsctl/v2/internal/tlsquery"
+	"io"
 )
 
 type JSONRenderer struct{}
 
-func (JSONRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
-	outputData := chain.WithoutPEM()
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(outputData)
+func (r JSONRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
+	return r.RenderAll(w, []*tlsquery.ChainInfo{chain}, opts)
 }
-
-func (JSONRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
-	clean := make([]tlsquery.ChainInfo, len(chains))
-	for i, chain := range chains {
-		clean[i] = *chain.WithoutPEM()
-	}
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(clean)
+func (r JSONRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
+	return r.RenderBatch(w, resultsFromChains(chains), opts)
 }
-
 func (JSONRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
-	if opts.FormatVersionOrDefault() >= 2 {
-		return encoder.Encode(toBatchEnvelopeV2(results, opts))
-	}
-	return encoder.Encode(toBatchResultsV1(results))
+	return encoder.Encode(toBatchEnvelope(results, opts))
 }

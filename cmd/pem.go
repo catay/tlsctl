@@ -4,86 +4,66 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
-	"github.com/catay/tlsctl/internal/output"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 	"github.com/spf13/cobra"
 )
 
 func newPemCmd(rt *Runtime) *cobra.Command {
-	var outputFormat string
-	var caCertFile string
+	var flags certFlags
 	var rf revocationFlags
-
 	cmd := &cobra.Command{
-		Use:   "pem [FILE | -]",
-		Short: "Parse and display certificates from a PEM file or stdin",
-		Long:  `Reads a PEM file (or stdin when '-' is given) and displays certificate metadata for all certificates found.`,
-		Args:  cobra.MaximumNArgs(1),
+		Use:     "pem [FILE | -]",
+		Short:   "Inspect certificates from a PEM file or stdin",
+		Long:    "Read certificates in PEM order, with the leaf first. Omit FILE or use '-' to read stdin. Verification checks trust and validity without a hostname or server-auth requirement.",
+		Example: "  tlsctl pem chain.pem\n  tlsctl pem -o json chain.pem\n  tlsctl pem - < chain.pem\n  tlsctl pem --cacert private-ca.pem chain.pem",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validateCertFlags(); err != nil {
+			if err := flags.validate(); err != nil {
 				return err
 			}
-			if err := validateRevocationMode(rf.mode); err != nil {
+			if err := rf.validate(); err != nil {
 				return err
 			}
-
-			opts := tlsquery.PEMOptions{CACertFile: caCertFile}
-
-			var chainInfo *tlsquery.ChainInfo
-			var err error
-
-			if len(args) == 0 || args[0] == "-" {
-				if len(args) == 0 {
-					// No args: require piped stdin
-					stat, sErr := os.Stdin.Stat()
-					if sErr != nil || stat.Mode()&os.ModeCharDevice != 0 {
+			source := "stdin"
+			if len(args) > 0 && args[0] != "-" {
+				source = args[0]
+			}
+			if len(args) == 0 {
+				if file, ok := cmd.InOrStdin().(*os.File); ok {
+					stat, err := file.Stat()
+					if err != nil || stat.Mode()&os.ModeCharDevice != 0 {
 						return fmt.Errorf("no input: provide a FILE argument or pipe PEM data to stdin")
 					}
 				}
-				data, rErr := io.ReadAll(os.Stdin)
-				if rErr != nil {
-					return fmt.Errorf("failed to read stdin: %w", rErr)
-				}
-				chainInfo, err = tlsquery.ParsePEM(data, opts)
-				if err == nil {
-					chainInfo.InputName = "stdin"
-					chainInfo.InputLabel = "source"
-				}
-			} else {
-				chainInfo, err = tlsquery.ParsePEMFile(args[0], opts)
 			}
+			cmd.SilenceUsage = true
+			roots, err := tlsquery.LoadRootCAs(flags.caCertFile)
 			if err != nil {
 				return err
 			}
-
-			if rf.mode != "" {
-				runRevocationCheck(chainInfo, rf.mode, rf.timeout, rf.softFail)
+			opts := tlsquery.PEMOptions{RootCAs: roots}
+			var chain *tlsquery.ChainInfo
+			if source == "stdin" && (len(args) == 0 || args[0] == "-") {
+				var data []byte
+				data, err = io.ReadAll(cmd.InOrStdin())
+				if err == nil {
+					chain, err = tlsquery.ParsePEM(data, opts)
+				}
+			} else {
+				chain, err = tlsquery.ParsePEMFile(source, opts)
 			}
-
-			now := rt.NowFunc()
-			updateExitCodeForChain(rt.ExitTracker, chainInfo, now, expiryWarningDays)
-
-			renderOpts := output.Options{
-				Now:               func() time.Time { return now },
-				ExpiryWarningDays: expiryWarningDays,
+			if err == nil {
+				chain.InputName, chain.InputLabel = source, "source"
+				runRevocationCheck(cmd.Context(), chain, rf)
+				if cmd.Context().Err() != nil {
+					err = cmd.Context().Err()
+				}
 			}
-			if quiet {
-				return nil
-			}
-			return renderChains(rt.Stdout, output.Format(outputFormat), []*tlsquery.ChainInfo{chainInfo}, renderOpts)
+			return finishResults(rt, flags, []targetResult{{endpoint: source, chain: chain, err: err}})
 		},
 	}
-
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format: human (default), json, yaml, csv, csv-full, text (verbose), raw (PEM)")
-	cmd.Flags().StringVar(&caCertFile, "cacert", "", "Path to CA certificate file (PEM format)")
+	addCertFlags(cmd, &flags)
 	addRevocationFlags(cmd, &rf)
-	addCertFlags(cmd)
-
 	return cmd
-}
-
-func init() {
-	rootCmd.AddCommand(newPemCmd(defaultRuntime))
 }

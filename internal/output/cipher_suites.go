@@ -1,6 +1,6 @@
 package output
 
-import "github.com/catay/tlsctl/internal/tlsquery"
+import "github.com/catay/tlsctl/v2/internal/tlsquery"
 
 func cipherSuitesBySecurity(version tlsquery.TLSVersionInfo) (secure []string, insecure []string) {
 	if len(version.SecureCipherSuites) > 0 || len(version.InsecureCipherSuites) > 0 {

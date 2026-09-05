@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 type Renderer interface {
@@ -18,7 +18,6 @@ type MultiRenderer interface {
 type Options struct {
 	Now               func() time.Time
 	ExpiryWarningDays int
-	FormatVersion     int
 }
 
 func (o Options) NowFunc() time.Time {
@@ -35,9 +34,30 @@ func (o Options) WarningDays() int {
 	return o.ExpiryWarningDays
 }
 
-func (o Options) FormatVersionOrDefault() int {
-	if o.FormatVersion <= 0 {
-		return 1
+func resultsFromChains(chains []*tlsquery.ChainInfo) []TargetResult {
+	results := make([]TargetResult, 0, len(chains))
+	for _, chain := range chains {
+		if chain != nil {
+			results = append(results, TargetResult{Target: chain.InputName, Result: chain})
+		}
 	}
-	return o.FormatVersion
+	return results
+}
+
+// checkedWriter retains the first write error across formatted output calls.
+type checkedWriter struct {
+	writer io.Writer
+	err    error
+}
+
+func (w *checkedWriter) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	n, err := w.writer.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
+	w.err = err
+	return n, err
 }

@@ -9,17 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catay/tlsctl/internal/revocation"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/revocation"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 	"gopkg.in/yaml.v3"
 )
-
-type batchResultV1Doc struct {
-	Target string              `json:"target" yaml:"target"`
-	OK     bool                `json:"ok" yaml:"ok"`
-	Error  string              `json:"error,omitempty" yaml:"error,omitempty"`
-	Result *tlsquery.ChainInfo `json:"result,omitempty" yaml:"result,omitempty"`
-}
 
 func testChain() *tlsquery.ChainInfo {
 	return &tlsquery.ChainInfo{
@@ -129,11 +122,15 @@ func TestJSONRenderer(t *testing.T) {
 		t.Fatalf("Render failed: %v", err)
 	}
 
-	var result tlsquery.ChainInfo
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+	var envelope BatchEnvelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal JSON: %v", err)
 	}
 
+	if len(envelope.Results) != 1 || envelope.Results[0].Result == nil {
+		t.Fatalf("invalid envelope: %+v", envelope)
+	}
+	result := envelope.Results[0].Result
 	if len(result.Certificates) != 1 {
 		t.Errorf("expected 1 certificate, got %d", len(result.Certificates))
 	}
@@ -174,11 +171,15 @@ func TestYAMLRenderer(t *testing.T) {
 		t.Fatalf("Render failed: %v", err)
 	}
 
-	var result tlsquery.ChainInfo
-	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
+	var envelope BatchEnvelope
+	if err := yaml.Unmarshal(buf.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal YAML: %v", err)
 	}
 
+	if len(envelope.Results) != 1 || envelope.Results[0].Result == nil {
+		t.Fatalf("invalid envelope: %+v", envelope)
+	}
+	result := envelope.Results[0].Result
 	if len(result.Certificates) != 1 {
 		t.Errorf("expected 1 certificate, got %d", len(result.Certificates))
 	}
@@ -220,92 +221,6 @@ func TestJSONRendererBatch(t *testing.T) {
 		t.Fatalf("RenderBatch failed: %v", err)
 	}
 
-	var got []batchResultV1Doc
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("failed to unmarshal batch JSON: %v", err)
-	}
-
-	if len(got) != 2 {
-		t.Fatalf("expected 2 batch results, got %d", len(got))
-	}
-	if !got[0].OK || got[0].Result == nil {
-		t.Fatalf("expected first batch result to contain a successful chain")
-	}
-	if got[0].Result.Certificates[0].PEM != "" {
-		t.Error("PEM should be stripped from batch JSON output")
-	}
-	if got[1].OK {
-		t.Error("expected second batch result to be marked as failed")
-	}
-	if got[1].Error != "connection failed" {
-		t.Errorf("unexpected batch error: %q", got[1].Error)
-	}
-	if got[1].Result != nil {
-		t.Error("expected failed batch result to omit the chain result")
-	}
-}
-
-func TestYAMLRendererBatch(t *testing.T) {
-	chain := testChain()
-	chain.Verified = true
-	var buf bytes.Buffer
-	r := YAMLRenderer{}
-
-	results := []TargetResult{
-		{
-			Target: "test.example.com:443",
-			Result: chain,
-		},
-		{
-			Target: "missing.example.com:443",
-			Error:  "connection failed",
-		},
-	}
-
-	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow}); err != nil {
-		t.Fatalf("RenderBatch failed: %v", err)
-	}
-
-	var got []batchResultV1Doc
-	if err := yaml.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("failed to unmarshal batch YAML: %v", err)
-	}
-
-	if len(got) != 2 {
-		t.Fatalf("expected 2 batch results, got %d", len(got))
-	}
-	if !got[0].OK || got[0].Result == nil {
-		t.Fatalf("expected first batch result to contain a successful chain")
-	}
-	if got[0].Result.Certificates[0].PEM != "" {
-		t.Error("PEM should be stripped from batch YAML output")
-	}
-	if got[1].Error != "connection failed" {
-		t.Errorf("unexpected batch error: %q", got[1].Error)
-	}
-}
-
-func TestJSONRendererBatchV2(t *testing.T) {
-	chain := testChain()
-	chain.Verified = true
-	var buf bytes.Buffer
-	r := JSONRenderer{}
-
-	results := []TargetResult{
-		{
-			Target: "test.example.com:443",
-			Result: chain,
-		},
-		{
-			Target: "missing.example.com:443",
-			Error:  "connection failed",
-		},
-	}
-
-	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow, FormatVersion: 2}); err != nil {
-		t.Fatalf("RenderBatch failed: %v", err)
-	}
-
 	var got BatchEnvelope
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("failed to unmarshal batch JSON v2: %v", err)
@@ -337,7 +252,7 @@ func TestJSONRendererBatchV2(t *testing.T) {
 	}
 }
 
-func TestYAMLRendererBatchV2(t *testing.T) {
+func TestYAMLRendererBatch(t *testing.T) {
 	chain := testChain()
 	chain.Verified = true
 	var buf bytes.Buffer
@@ -354,7 +269,7 @@ func TestYAMLRendererBatchV2(t *testing.T) {
 		},
 	}
 
-	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow, FormatVersion: 2}); err != nil {
+	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow}); err != nil {
 		t.Fatalf("RenderBatch failed: %v", err)
 	}
 
@@ -427,7 +342,7 @@ func TestTargetResultTLSStatus(t *testing.T) {
 			}
 			result.Result.Verified = true
 			tt.mutate(&result)
-			if got := result.TLSStatus(Options{Now: fixedNow, FormatVersion: 2}); got != tt.want {
+			if got := result.TLSStatus(Options{Now: fixedNow}); got != tt.want {
 				t.Fatalf("TLSStatus() = %q, want %q", got, tt.want)
 			}
 		})
@@ -549,65 +464,6 @@ func TestCSVRendererBatch(t *testing.T) {
 
 	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
 	if err != nil {
-		t.Fatalf("failed to parse batch CSV: %v", err)
-	}
-	if len(rows) != 3 {
-		t.Fatalf("expected header plus two rows, got %d rows", len(rows))
-	}
-
-	record1 := make(map[string]string, len(rows[0]))
-	record2 := make(map[string]string, len(rows[0]))
-	for i, header := range rows[0] {
-		record1[header] = rows[1][i]
-		record2[header] = rows[2][i]
-	}
-
-	if record1["ok"] != "true" || record1["error"] != "" {
-		t.Fatalf("expected successful batch row, got ok=%q error=%q", record1["ok"], record1["error"])
-	}
-	if record1["common_name"] != "test.example.com" {
-		t.Errorf("unexpected common_name for success row: %q", record1["common_name"])
-	}
-	if record1["tls_version"] != "TLS 1.3" || record1["cipher_suite"] != "TLS_AES_128_GCM_SHA256" || record1["alpn"] != "h2" {
-		t.Errorf("expected negotiated tls fields for success row, got tls_version=%q cipher_suite=%q alpn=%q", record1["tls_version"], record1["cipher_suite"], record1["alpn"])
-	}
-	if record2["target"] != "missing.example.com:443" {
-		t.Errorf("unexpected target for error row: %q", record2["target"])
-	}
-	if record2["ok"] != "false" || record2["error"] != "connection failed" {
-		t.Fatalf("expected failed batch row, got ok=%q error=%q", record2["ok"], record2["error"])
-	}
-	if record2["common_name"] != "" {
-		t.Errorf("expected empty common_name for failed row, got %q", record2["common_name"])
-	}
-	if record2["tls_version"] != "" || record2["cipher_suite"] != "" || record2["alpn"] != "" {
-		t.Errorf("expected empty negotiated tls fields for failed row, got tls_version=%q cipher_suite=%q alpn=%q", record2["tls_version"], record2["cipher_suite"], record2["alpn"])
-	}
-}
-
-func TestCSVRendererBatchV2(t *testing.T) {
-	chain := testChain()
-	chain.Verified = true
-	var buf bytes.Buffer
-	r := CSVRenderer{}
-
-	results := []TargetResult{
-		{
-			Target: "test.example.com:443",
-			Result: chain,
-		},
-		{
-			Target: "missing.example.com:443",
-			Error:  "connection failed",
-		},
-	}
-
-	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow, FormatVersion: 2}); err != nil {
-		t.Fatalf("RenderBatch failed: %v", err)
-	}
-
-	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
-	if err != nil {
 		t.Fatalf("failed to parse batch CSV v2: %v", err)
 	}
 	if len(rows) != 3 {
@@ -662,53 +518,6 @@ func TestCSVFullRendererBatch(t *testing.T) {
 	}
 
 	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow}); err != nil {
-		t.Fatalf("RenderBatch failed: %v", err)
-	}
-
-	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
-	if err != nil {
-		t.Fatalf("failed to parse batch CSV full output: %v", err)
-	}
-	if len(rows) != 3 {
-		t.Fatalf("expected header plus two rows, got %d rows", len(rows))
-	}
-
-	record1 := make(map[string]string, len(rows[0]))
-	record2 := make(map[string]string, len(rows[0]))
-	for i, header := range rows[0] {
-		record1[header] = rows[1][i]
-		record2[header] = rows[2][i]
-	}
-
-	if record1["ok"] != "true" || record1["certificate_type"] != "leaf" {
-		t.Fatalf("unexpected success row in batch csv-full: ok=%q certificate_type=%q", record1["ok"], record1["certificate_type"])
-	}
-	if record2["ok"] != "false" || record2["error"] != "connection failed" {
-		t.Fatalf("unexpected error row in batch csv-full: ok=%q error=%q", record2["ok"], record2["error"])
-	}
-	if record2["certificate_type"] != "" {
-		t.Errorf("expected empty certificate_type for failed row, got %q", record2["certificate_type"])
-	}
-}
-
-func TestCSVFullRendererBatchV2(t *testing.T) {
-	chain := testChain()
-	chain.Verified = true
-	var buf bytes.Buffer
-	r := CSVFullRenderer{}
-
-	results := []TargetResult{
-		{
-			Target: "test.example.com:443",
-			Result: chain,
-		},
-		{
-			Target: "missing.example.com:443",
-			Error:  "connection failed",
-		},
-	}
-
-	if err := r.RenderBatch(&buf, results, Options{Now: fixedNow, FormatVersion: 2}); err != nil {
 		t.Fatalf("RenderBatch failed: %v", err)
 	}
 
@@ -778,7 +587,7 @@ func TestHumanRenderer(t *testing.T) {
 	if !strings.Contains(output, "expires in") {
 		t.Error("expected expiry info in output")
 	}
-	if !strings.Contains(output, "Handshake: TLS 1.3 / TLS_AES_128_GCM_SHA256 / h2") {
+	if !strings.Contains(output, "Handshake:  TLS 1.3 / TLS_AES_128_GCM_SHA256 / h2") {
 		t.Fatalf("expected handshake summary in human output, got %q", output)
 	}
 }

@@ -1,0 +1,10 @@
+.git
+.agents
+.codex
+dist
+tlsctl
+*.md
+docs
+images
+.github
+**/*_test.go

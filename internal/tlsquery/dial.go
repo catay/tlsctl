@@ -1,6 +1,7 @@
 package tlsquery
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"time"
 )
 
-func dialAndHandshake(endpoint string, proxyURL *url.URL, config *tls.Config, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) ([]*x509.Certificate, *HandshakeInfo, error) {
-	conn, err := dialTLS(endpoint, proxyURL, config, connectTimeout, handshakeTimeout, startTLSProto)
+func dialAndHandshake(ctx context.Context, endpoint string, proxyURL *url.URL, config *tls.Config, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) ([]*x509.Certificate, *HandshakeInfo, error) {
+	conn, err := dialTLS(ctx, endpoint, proxyURL, config, connectTimeout, handshakeTimeout, startTLSProto)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,7 +53,7 @@ func negotiatedHandshakeInfo(state tls.ConnectionState) *HandshakeInfo {
 // probeTLSVersions tests which TLS versions the server supports by attempting
 // a handshake with each version individually, and enumerates the supported
 // cipher suites in server-preferred order for each version.
-func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, insecure bool, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) []TLSVersionInfo {
+func probeTLSVersions(ctx context.Context, endpoint string, proxyURL *url.URL, baseConfig *tls.Config, insecure bool, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) []TLSVersionInfo {
 	versions := []uint16{
 		tls.VersionTLS10,
 		tls.VersionTLS11,
@@ -62,18 +63,27 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 
 	var supported []TLSVersionInfo
 	for _, v := range versions {
+		if ctx.Err() != nil {
+			break
+		}
 		cfg := baseConfig.Clone()
 		cfg.MinVersion = v
 		cfg.MaxVersion = v
 		cfg.InsecureSkipVerify = insecure
 
-		conn, err := dialTLS(endpoint, proxyURL, cfg, connectTimeout, handshakeTimeout, startTLSProto)
+		conn, err := dialTLS(ctx, endpoint, proxyURL, cfg, connectTimeout, handshakeTimeout, startTLSProto)
 		if err != nil {
 			continue
 		}
+		negotiated := tls.CipherSuiteName(conn.ConnectionState().CipherSuite)
 		conn.Close()
 
-		ciphers := probeCipherSuites(endpoint, proxyURL, baseConfig, v, insecure, startTLSProto, connectTimeout, handshakeTimeout)
+		var ciphers []string
+		if v == tls.VersionTLS13 {
+			ciphers = []string{negotiated}
+		} else {
+			ciphers = probeCipherSuites(ctx, endpoint, proxyURL, baseConfig, v, insecure, startTLSProto, connectTimeout, handshakeTimeout)
+		}
 		secureCiphers, insecureCiphers := SplitCipherSuitesBySecurity(ciphers)
 		supported = append(supported, TLSVersionInfo{
 			Version:              tlsVersionName(v),
@@ -91,35 +101,24 @@ func probeTLSVersions(endpoint string, proxyURL *url.URL, baseConfig *tls.Config
 //
 // For TLS 1.0–1.2 it performs repeated handshakes, each time removing the
 // previously negotiated cipher suite, so the result reflects the server's
-// preference. For TLS 1.3 the cipher suites are not configurable in Go's
-// crypto/tls, so only the negotiated cipher suite is returned.
-func probeCipherSuites(endpoint string, proxyURL *url.URL, baseConfig *tls.Config, version uint16, insecure bool, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) []string {
-	if version == tls.VersionTLS13 {
-		cfg := baseConfig.Clone()
-		cfg.MinVersion = tls.VersionTLS13
-		cfg.MaxVersion = tls.VersionTLS13
-		cfg.InsecureSkipVerify = insecure
-
-		conn, err := dialTLS(endpoint, proxyURL, cfg, connectTimeout, handshakeTimeout, startTLSProto)
-		if err != nil {
-			return nil
-		}
-		state := conn.ConnectionState()
-		conn.Close()
-		return []string{tls.CipherSuiteName(state.CipherSuite)}
-	}
+// preference. TLS 1.3 is handled directly by probeTLSVersions because Go does
+// not permit configuring TLS 1.3 suites individually.
+func probeCipherSuites(ctx context.Context, endpoint string, proxyURL *url.URL, baseConfig *tls.Config, version uint16, insecure bool, startTLSProto string, connectTimeout, handshakeTimeout time.Duration) []string {
 
 	available := cipherSuiteIDsForVersion(version)
 	var result []string
 
 	for len(available) > 0 {
+		if ctx.Err() != nil {
+			break
+		}
 		cfg := baseConfig.Clone()
 		cfg.MinVersion = version
 		cfg.MaxVersion = version
 		cfg.InsecureSkipVerify = insecure
 		cfg.CipherSuites = available
 
-		conn, err := dialTLS(endpoint, proxyURL, cfg, connectTimeout, handshakeTimeout, startTLSProto)
+		conn, err := dialTLS(ctx, endpoint, proxyURL, cfg, connectTimeout, handshakeTimeout, startTLSProto)
 		if err != nil {
 			break
 		}
@@ -163,13 +162,15 @@ func cipherSuiteIDsForVersion(version uint16) []uint16 {
 	return ids
 }
 
-func dialTLS(endpoint string, proxyURL *url.URL, config *tls.Config, connectTimeout, handshakeTimeout time.Duration, startTLSProto string) (*tls.Conn, error) {
-	rawConn, err := dialTCP(endpoint, proxyURL, connectTimeout, handshakeTimeout)
+func dialTLS(ctx context.Context, endpoint string, proxyURL *url.URL, config *tls.Config, connectTimeout, handshakeTimeout time.Duration, startTLSProto string) (*tls.Conn, error) {
+	rawConn, err := dialTCP(ctx, endpoint, proxyURL, connectTimeout, handshakeTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}
 
-	if err := rawConn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+	stop := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
+	defer stop()
+	if err := rawConn.SetDeadline(phaseDeadline(ctx, handshakeTimeout)); err != nil {
 		rawConn.Close()
 		return nil, fmt.Errorf("failed to configure handshake timeout: %w", err)
 	}
@@ -181,7 +182,7 @@ func dialTLS(endpoint string, proxyURL *url.URL, config *tls.Config, connectTime
 	}
 
 	conn := tls.Client(rawConn, config)
-	if err := conn.Handshake(); err != nil {
+	if err := conn.HandshakeContext(ctx); err != nil {
 		rawConn.Close()
 		return nil, err
 	}
@@ -193,9 +194,17 @@ func dialTLS(endpoint string, proxyURL *url.URL, config *tls.Config, connectTime
 	return conn, nil
 }
 
-func dialTCP(endpoint string, proxyURL *url.URL, connectTimeout, handshakeTimeout time.Duration) (net.Conn, error) {
+func dialTCP(ctx context.Context, endpoint string, proxyURL *url.URL, connectTimeout, handshakeTimeout time.Duration) (net.Conn, error) {
 	if proxyURL != nil {
-		return dialViaProxy(endpoint, proxyURL, connectTimeout, handshakeTimeout)
+		return dialViaProxyContext(ctx, endpoint, proxyURL, connectTimeout, handshakeTimeout)
 	}
-	return (&net.Dialer{Timeout: connectTimeout}).Dial("tcp", endpoint)
+	return (&net.Dialer{Timeout: connectTimeout}).DialContext(ctx, "tcp", endpoint)
+}
+
+func phaseDeadline(ctx context.Context, timeout time.Duration) time.Time {
+	deadline := time.Now().Add(timeout)
+	if parent, ok := ctx.Deadline(); ok && parent.Before(deadline) {
+		return parent
+	}
+	return deadline
 }

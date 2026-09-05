@@ -7,8 +7,16 @@ on:
       - "go.mod"
       - "go.sum"
       - ".goreleaser.yaml"
+      - ".golangci.yml"
       - "Dockerfile.goreleaser"
       - "VERSION"
+      - "Dockerfile"
+      - "Makefile"
+      - ".dockerignore"
+      - ".github/workflows/**"
+      - "scripts/**"
+      - "docs/**"
+      - "README.md"
 
 permissions:
   contents: read
@@ -55,7 +63,16 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests
-        run: go test ./...
+        run: go test -race -cover ./...
+
+  vulnerability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: make vuln
 
   build:
     runs-on: ubuntu-latest
@@ -76,3 +93,18 @@ jobs:
         with:
           version: latest
           args: release --snapshot --clean --skip publish
+
+      - name: Check source container
+        run: |
+          docker build -t tlsctl:ci .
+          docker run --rm tlsctl:ci version
+          docker run --rm tlsctl:ci client --help
+          if printf 'invalid PEM' | docker run --rm -i tlsctl:ci pem -o json - > result.json; then
+            echo "Invalid PEM unexpectedly succeeded" >&2
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
+          test "$(jq -r '.status' result.json)" = failure
+          test "$(jq -r '.results[0].target' result.json)" = stdin
+          docker run --rm --platform linux/amd64 cataybe/tlsctl:latest-amd64 version

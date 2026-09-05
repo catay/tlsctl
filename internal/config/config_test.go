@@ -128,10 +128,10 @@ func TestLoad_InvalidALPN(t *testing.T) {
 	}
 }
 
-func TestLoad_InvalidFormatVersion(t *testing.T) {
+func TestLoad_RemovedFormatVersion(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
-	if err := os.WriteFile(path, []byte(`{"client": {"format-version": 3}}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"client": {"format-version": 2}}`), 0644); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -175,7 +175,6 @@ func TestLoad_ValidConfig(t *testing.T) {
 		"client": {
 			"expiry-warning": 21,
 			"output": "json",
-			"format-version": 2,
 			"proxy": "http://proxy:8080",
 			"tls-versions": true,
 			"alpn": "h2,http/1.1",
@@ -221,9 +220,6 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if s.Client.Output == nil || *s.Client.Output != "json" {
 		t.Error("expected client.output = json")
 	}
-	if s.Client.FormatVersion == nil || *s.Client.FormatVersion != 2 {
-		t.Error("expected client.format-version = 2")
-	}
 	if s.Client.Proxy == nil || *s.Client.Proxy != "http://proxy:8080" {
 		t.Error("expected client.proxy")
 	}
@@ -258,7 +254,6 @@ func TestLoad_ValidConfig(t *testing.T) {
 func TestFlagValues_Client(t *testing.T) {
 	expiry := 21
 	output := "json"
-	formatVersion := 2
 	alpn := "h2,http/1.1"
 	connectTimeout := Duration{Duration: 4 * time.Second}
 	handshakeTimeout := Duration{Duration: 9 * time.Second}
@@ -266,7 +261,6 @@ func TestFlagValues_Client(t *testing.T) {
 		Client: ClientSettings{
 			ExpiryWarning:    &expiry,
 			Output:           &output,
-			FormatVersion:    &formatVersion,
 			ALPN:             &alpn,
 			ConnectTimeout:   &connectTimeout,
 			HandshakeTimeout: &handshakeTimeout,
@@ -279,9 +273,6 @@ func TestFlagValues_Client(t *testing.T) {
 	}
 	if vals["output"] != "json" {
 		t.Errorf("expected output=json, got %s", vals["output"])
-	}
-	if vals["format-version"] != "2" {
-		t.Errorf("expected format-version=2, got %s", vals["format-version"])
 	}
 	if vals["alpn"] != "h2,http/1.1" {
 		t.Errorf("expected alpn=h2,http/1.1, got %s", vals["alpn"])

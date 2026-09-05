@@ -1,7 +1,7 @@
 package tlsquery
 
 import (
-	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -25,66 +25,68 @@ func ParseALPNProtocols(value string) ([]string, error) {
 		if proto == "" {
 			return nil, fmt.Errorf("empty ALPN protocol in %q", value)
 		}
+		if len(proto) > 255 {
+			return nil, fmt.Errorf("ALPN protocol exceeds 255 bytes")
+		}
 		protocols = append(protocols, proto)
 	}
 
 	return protocols, nil
 }
 
-// Query connects to the given endpoint and retrieves certificate chain information.
+// Query connects to an endpoint using a background context.
 func Query(endpoint string, opts QueryOptions) (*ChainInfo, error) {
+	return QueryContext(context.Background(), endpoint, opts)
+}
+
+// QueryContext retrieves and verifies the certificates from the same connection.
+// No application data is exchanged. Verification is performed explicitly so
+// invalid certificates can still be inspected without reconnecting.
+func QueryContext(ctx context.Context, endpoint string, opts QueryOptions) (*ChainInfo, error) {
 	config, err := buildConfig(opts)
 	if err != nil {
 		return nil, err
 	}
-
-	probeVersions := opts.TLSVersions
-	startTLS := opts.StartTLS
-	connectTimeout, handshakeTimeout := resolveTimeouts(opts)
-
-	host, _, _ := net.SplitHostPort(endpoint)
-	if config.ServerName == "" && host != "" {
-		config.ServerName = host
+	host, _, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("invalid endpoint: %w", err)
 	}
-
+	if config.ServerName == "" {
+		config.ServerName = strings.Split(host, "%")[0]
+	}
 	proxyURL, err := resolveProxy(endpoint, opts)
 	if err != nil {
 		return nil, fmt.Errorf("invalid proxy configuration: %w", err)
 	}
-
-	certs, negotiatedTLS, err := dialAndHandshake(endpoint, proxyURL, config, startTLS, connectTimeout, handshakeTimeout)
-	if err != nil {
-		if !isVerificationError(err) {
-			return nil, fmt.Errorf("TLS handshake failed: %w", err)
-		}
-		verifyErr := err
-
-		insecureConfig := config.Clone()
-		insecureConfig.InsecureSkipVerify = true
-		certs, negotiatedTLS, err = dialAndHandshake(endpoint, proxyURL, insecureConfig, startTLS, connectTimeout, handshakeTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("TLS handshake failed: %w", err)
-		}
-
-		chain := buildChain(certs)
-		chain.Verified = false
-		chain.VerificationError = abbreviateVerifyErrorWithChain(verifyErr, certs)
-		chain.NegotiatedTLS = negotiatedTLS
-		chain.InputName = endpoint
-		chain.InputLabel = "target"
-		if probeVersions {
-			chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, true, startTLS, connectTimeout, handshakeTimeout)
-		}
-		return chain, nil
+	connectTimeout, handshakeTimeout := resolveTimeouts(opts)
+	config.InsecureSkipVerify = true // Explicit x509 verification below.
+	if opts.TLSVersions {
+		config.MinVersion = tls.VersionTLS10
+		config.CipherSuites = cipherSuiteIDsForVersion(tls.VersionTLS12)
 	}
-
+	certs, handshake, err := dialAndHandshake(ctx, endpoint, proxyURL, config, opts.StartTLS, connectTimeout, handshakeTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("TLS handshake failed: %w", err)
+	}
 	chain := buildChain(certs)
-	chain.Verified = true
-	chain.NegotiatedTLS = negotiatedTLS
-	chain.InputName = endpoint
-	chain.InputLabel = "target"
-	if probeVersions {
-		chain.TLSVersions = probeTLSVersions(endpoint, proxyURL, config, false, startTLS, connectTimeout, handshakeTimeout)
+	inter := x509.NewCertPool()
+	for _, cert := range certs[1:] {
+		inter.AddCert(cert)
+	}
+	verified, verifyErr := certs[0].Verify(x509.VerifyOptions{DNSName: config.ServerName, Roots: config.RootCAs, Intermediates: inter})
+	chain.Verified = verifyErr == nil
+	if verifyErr != nil {
+		chain.VerificationError = abbreviateVerifyError(verifyErr)
+	}
+	if len(verified) > 0 && len(verified[0]) > 1 {
+		chain.issuer = verified[0][1]
+	}
+	chain.NegotiatedTLS, chain.InputName, chain.InputLabel = handshake, endpoint, "target"
+	if opts.TLSVersions {
+		chain.TLSVersions = probeTLSVersions(ctx, endpoint, proxyURL, config, true, opts.StartTLS, connectTimeout, handshakeTimeout)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 	}
 	return chain, nil
 }
@@ -113,19 +115,13 @@ func buildConfig(opts QueryOptions) (*tls.Config, error) {
 		config.NextProtos = append([]string(nil), opts.ALPNProtocols...)
 	}
 
-	if opts.CACertFile != "" {
-		caCert, err := os.ReadFile(opts.CACertFile)
+	config.RootCAs = opts.RootCAs
+	if config.RootCAs == nil && opts.CACertFile != "" {
+		var err error
+		config.RootCAs, err = LoadRootCAs(opts.CACertFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+			return nil, err
 		}
-		caCertPool, err := x509.SystemCertPool()
-		if err != nil {
-			caCertPool = x509.NewCertPool()
-		}
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse CA certificate")
-		}
-		config.RootCAs = caCertPool
 	}
 
 	return config, nil
@@ -134,37 +130,12 @@ func buildConfig(opts QueryOptions) (*tls.Config, error) {
 func buildChain(certs []*x509.Certificate) *ChainInfo {
 	chain := &ChainInfo{
 		Certificates: make([]CertInfo, 0, len(certs)),
+		parsed:       certs,
 	}
 	for _, cert := range certs {
 		chain.Certificates = append(chain.Certificates, CertInfoFromCert(cert))
 	}
 	return chain
-}
-
-func isVerificationError(err error) bool {
-	var hostErr x509.HostnameError
-	var unknownAuth x509.UnknownAuthorityError
-	var certInvalid x509.CertificateInvalidError
-	var sysRoots x509.SystemRootsError
-	return errors.As(err, &hostErr) ||
-		errors.As(err, &unknownAuth) ||
-		errors.As(err, &certInvalid) ||
-		errors.As(err, &sysRoots)
-}
-
-func abbreviateVerifyErrorWithChain(err error, certs []*x509.Certificate) string {
-	var unknownAuth x509.UnknownAuthorityError
-	if errors.As(err, &unknownAuth) && len(certs) > 0 {
-		top := certs[len(certs)-1]
-		if !isSelfSigned(top) {
-			return "incomplete chain"
-		}
-	}
-	return abbreviateVerifyError(err)
-}
-
-func isSelfSigned(cert *x509.Certificate) bool {
-	return bytes.Equal(cert.RawIssuer, cert.RawSubject)
 }
 
 func abbreviateVerifyError(err error) string {
@@ -180,6 +151,9 @@ func abbreviateVerifyError(err error) string {
 	if errors.As(err, &certInvalid) {
 		switch certInvalid.Reason {
 		case x509.Expired:
+			if certInvalid.Cert != nil && time.Now().Before(certInvalid.Cert.NotBefore) {
+				return "certificate not yet valid"
+			}
 			return "certificate expired"
 		case x509.NotAuthorizedToSign:
 			return "not authorized to sign"
@@ -194,4 +168,24 @@ func abbreviateVerifyError(err error) string {
 		return "system roots unavailable"
 	}
 	return strings.TrimPrefix(err.Error(), "x509: ")
+}
+
+// LoadRootCAs prepares an immutable trust pool. A nil pool uses system trust.
+// An explicitly configured CA file must be readable and contain certificates.
+func LoadRootCAs(path string) (*x509.CertPool, error) {
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate %q: %w", path, err)
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		roots = x509.NewCertPool()
+	}
+	if !roots.AppendCertsFromPEM(data) {
+		return nil, fmt.Errorf("failed to parse CA certificate %q", path)
+	}
+	return roots, nil
 }

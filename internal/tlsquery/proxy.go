@@ -2,12 +2,14 @@ package tlsquery
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,36 +30,46 @@ func resolveProxy(endpoint string, opts QueryOptions) (*url.URL, error) {
 		if !strings.Contains(proxyStr, "://") {
 			proxyStr = "http://" + proxyStr
 		}
-		return url.Parse(proxyStr)
+		return parseProxy(proxyStr)
 	}
 
 	req := &http.Request{URL: &url.URL{Scheme: "https", Host: endpoint}}
-	return http.ProxyFromEnvironment(req)
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil || proxy == nil {
+		return proxy, err
+	}
+	return parseProxy(proxy.String())
 }
 
 func dialViaProxy(endpoint string, proxyURL *url.URL, connectTimeout, handshakeTimeout time.Duration) (net.Conn, error) {
+	return dialViaProxyContext(context.Background(), endpoint, proxyURL, connectTimeout, handshakeTimeout)
+}
+func dialViaProxyContext(ctx context.Context, endpoint string, proxyURL *url.URL, connectTimeout, handshakeTimeout time.Duration) (net.Conn, error) {
 	proxyAddr := proxyURL.Host
 	if _, _, err := net.SplitHostPort(proxyAddr); err != nil {
-		port := "8080"
+		port := "80"
 		if proxyURL.Scheme == "https" {
 			port = "443"
 		}
-		proxyAddr = net.JoinHostPort(proxyAddr, port)
+		proxyAddr = net.JoinHostPort(proxyURL.Hostname(), port)
 	}
 
 	dialer := &net.Dialer{Timeout: connectTimeout}
-	conn, err := dialer.Dial("tcp", proxyAddr)
+	conn, err := dialer.DialContext(ctx, "tcp", proxyAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to proxy %s: %w", proxyAddr, err)
 	}
-	if err := conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+	rawConn := conn
+	stop := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
+	defer stop()
+	if err := conn.SetDeadline(phaseDeadline(ctx, handshakeTimeout)); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to configure proxy timeout: %w", err)
 	}
 
 	if proxyURL.Scheme == "https" {
 		tlsConn := tls.Client(conn, &tls.Config{ServerName: proxyURL.Hostname()})
-		if err := tlsConn.Handshake(); err != nil {
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("TLS handshake with proxy failed: %w", err)
 		}
@@ -102,4 +114,34 @@ func dialViaProxy(endpoint string, proxyURL *url.URL, connectTimeout, handshakeT
 	}
 
 	return &bufferedConn{Conn: conn, r: br}, nil
+}
+
+func ValidateProxy(value string) error {
+	if value == "" {
+		return nil
+	}
+	_, err := parseProxy(value)
+	return err
+}
+func parseProxy(value string) (*url.URL, error) {
+	if !strings.Contains(value, "://") {
+		value = "http://" + value
+	}
+	proxy, err := url.Parse(value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy URL")
+	}
+	if proxy.Scheme != "http" && proxy.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported proxy scheme %q: use http or https", proxy.Scheme)
+	}
+	if proxy.Hostname() == "" || strings.ContainsAny(proxy.Hostname(), " \t\r\n") || proxy.Path != "" && proxy.Path != "/" || proxy.RawQuery != "" || proxy.Fragment != "" {
+		return nil, fmt.Errorf("proxy URL must contain a host and optional port, without a path, query, or fragment")
+	}
+	if port := proxy.Port(); port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 {
+			return nil, fmt.Errorf("proxy port must be between 1 and 65535")
+		}
+	}
+	return proxy, nil
 }

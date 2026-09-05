@@ -3,6 +3,7 @@ package tlsquery
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
@@ -59,7 +60,7 @@ func negotiateStartTLS(conn net.Conn, protocol string) error {
 }
 
 func negotiateSMTP(conn net.Conn) error {
-	r := bufio.NewReader(conn)
+	r := bufio.NewReaderSize(conn, 64*1024)
 
 	// Read greeting.
 	if err := expectSMTPReply(r, "220"); err != nil {
@@ -88,7 +89,7 @@ func negotiateSMTP(conn net.Conn) error {
 // expectSMTPReply reads SMTP multi-line replies and checks the response code.
 func expectSMTPReply(r *bufio.Reader, expectedCode string) error {
 	for {
-		line, err := r.ReadString('\n')
+		line, err := readProtocolLine(r)
 		if err != nil {
 			return err
 		}
@@ -100,6 +101,9 @@ func expectSMTPReply(r *bufio.Reader, expectedCode string) error {
 		if code != expectedCode {
 			return fmt.Errorf("unexpected response: %q", line)
 		}
+		if len(line) > 3 && line[3] != ' ' && line[3] != '-' {
+			return fmt.Errorf("malformed SMTP reply: %q", line)
+		}
 		// A space after the code means this is the last line.
 		if len(line) == 3 || line[3] == ' ' {
 			return nil
@@ -108,14 +112,14 @@ func expectSMTPReply(r *bufio.Reader, expectedCode string) error {
 }
 
 func negotiateIMAP(conn net.Conn) error {
-	r := bufio.NewReader(conn)
+	r := bufio.NewReaderSize(conn, 64*1024)
 
 	// Read server greeting (starts with "* ").
-	line, err := r.ReadString('\n')
+	line, err := readProtocolLine(r)
 	if err != nil {
 		return fmt.Errorf("IMAP greeting: %w", err)
 	}
-	if !strings.HasPrefix(line, "* ") {
+	if fields := strings.Fields(line); len(fields) < 2 || fields[0] != "*" || !strings.EqualFold(fields[1], "OK") {
 		return fmt.Errorf("IMAP: unexpected greeting: %q", strings.TrimRight(line, "\r\n"))
 	}
 
@@ -126,14 +130,14 @@ func negotiateIMAP(conn net.Conn) error {
 
 	// Read lines until we see the tagged response (skip untagged "* " lines).
 	for {
-		line, err = r.ReadString('\n')
+		line, err = readProtocolLine(r)
 		if err != nil {
 			return fmt.Errorf("IMAP STARTTLS response: %w", err)
 		}
 		if strings.HasPrefix(line, "* ") {
 			continue
 		}
-		if strings.HasPrefix(line, "a001 OK") {
+		if fields := strings.Fields(line); len(fields) >= 2 && fields[0] == "a001" && strings.EqualFold(fields[1], "OK") {
 			return nil
 		}
 		return fmt.Errorf("IMAP STARTTLS failed: %q", strings.TrimRight(line, "\r\n"))
@@ -141,14 +145,14 @@ func negotiateIMAP(conn net.Conn) error {
 }
 
 func negotiatePOP3(conn net.Conn) error {
-	r := bufio.NewReader(conn)
+	r := bufio.NewReaderSize(conn, 64*1024)
 
 	// Read greeting.
-	line, err := r.ReadString('\n')
+	line, err := readProtocolLine(r)
 	if err != nil {
 		return fmt.Errorf("POP3 greeting: %w", err)
 	}
-	if !strings.HasPrefix(line, "+OK") {
+	if fields := strings.Fields(line); len(fields) == 0 || fields[0] != "+OK" {
 		return fmt.Errorf("POP3: unexpected greeting: %q", strings.TrimRight(line, "\r\n"))
 	}
 
@@ -158,11 +162,11 @@ func negotiatePOP3(conn net.Conn) error {
 	}
 
 	// Read response.
-	line, err = r.ReadString('\n')
+	line, err = readProtocolLine(r)
 	if err != nil {
 		return fmt.Errorf("POP3 STLS response: %w", err)
 	}
-	if !strings.HasPrefix(line, "+OK") {
+	if fields := strings.Fields(line); len(fields) == 0 || fields[0] != "+OK" {
 		return fmt.Errorf("POP3 STLS failed: %q", strings.TrimRight(line, "\r\n"))
 	}
 
@@ -187,20 +191,23 @@ func negotiateLDAP(conn net.Conn) error {
 	}
 
 	// Read and decode the response.
-	resp, err := ber.ReadPacket(conn)
+	resp, err := ber.ReadPacket(io.LimitReader(conn, 64*1024))
 	if err != nil {
 		return fmt.Errorf("LDAP STARTTLS response: %w", err)
 	}
 
 	// Response: SEQUENCE { MessageID, ExtendedResponse(APPLICATION 24) { resultCode, ... } }
-	if len(resp.Children) < 2 {
+	if resp.ClassType != ber.ClassUniversal || resp.Tag != ber.TagSequence || len(resp.Children) != 2 {
 		return fmt.Errorf("LDAP: malformed response")
 	}
+	if id, ok := resp.Children[0].Value.(int64); !ok || id != 1 {
+		return fmt.Errorf("LDAP: unexpected message ID")
+	}
 	extResp := resp.Children[1]
-	if extResp.Tag != 24 {
+	if extResp.ClassType != ber.ClassApplication || extResp.TagType != ber.TypeConstructed || extResp.Tag != 24 {
 		return fmt.Errorf("LDAP: unexpected response tag %d", extResp.Tag)
 	}
-	if len(extResp.Children) < 1 {
+	if len(extResp.Children) < 3 || extResp.Children[0].ClassType != ber.ClassUniversal || extResp.Children[0].Tag != ber.TagEnumerated {
 		return fmt.Errorf("LDAP: malformed extended response")
 	}
 
@@ -210,4 +217,12 @@ func negotiateLDAP(conn net.Conn) error {
 	}
 
 	return nil
+}
+
+func readProtocolLine(r *bufio.Reader) (string, error) {
+	line, err := r.ReadSlice('\n')
+	if err == bufio.ErrBufferFull {
+		return "", fmt.Errorf("protocol response line exceeds 64 KiB")
+	}
+	return string(line), err
 }

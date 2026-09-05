@@ -9,6 +9,7 @@ import (
 
 // PEMOptions configures PEM parsing and verification behavior.
 type PEMOptions struct {
+	RootCAs    *x509.CertPool
 	CACertFile string // Path to custom CA certificate file (PEM format)
 }
 
@@ -55,30 +56,22 @@ func ParsePEM(data []byte, opts PEMOptions) (*ChainInfo, error) {
 
 	chain := buildChain(certs)
 
-	verifyPEMChain(chain, certs, opts)
+	if err := verifyPEMChain(chain, certs, opts); err != nil {
+		return nil, err
+	}
 
 	return chain, nil
 }
 
-func verifyPEMChain(chain *ChainInfo, certs []*x509.Certificate, opts PEMOptions) {
+func verifyPEMChain(chain *ChainInfo, certs []*x509.Certificate, opts PEMOptions) error {
 	leaf := certs[0]
 
-	roots, err := x509.SystemCertPool()
-	if err != nil {
-		roots = x509.NewCertPool()
-	}
-
-	if opts.CACertFile != "" {
-		caCert, err := os.ReadFile(opts.CACertFile)
+	roots := opts.RootCAs
+	if roots == nil && opts.CACertFile != "" {
+		var err error
+		roots, err = LoadRootCAs(opts.CACertFile)
 		if err != nil {
-			chain.Verified = false
-			chain.VerificationError = fmt.Sprintf("failed to read CA certificate: %s", err)
-			return
-		}
-		if !roots.AppendCertsFromPEM(caCert) {
-			chain.Verified = false
-			chain.VerificationError = "failed to parse CA certificate"
-			return
+			return err
 		}
 	}
 
@@ -93,10 +86,14 @@ func verifyPEMChain(chain *ChainInfo, certs []*x509.Certificate, opts PEMOptions
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}
 
-	if _, err := leaf.Verify(verifyOpts); err != nil {
+	if verified, err := leaf.Verify(verifyOpts); err != nil {
 		chain.Verified = false
-		chain.VerificationError = abbreviateVerifyErrorWithChain(err, certs)
+		chain.VerificationError = abbreviateVerifyError(err)
 	} else {
 		chain.Verified = true
+		if len(verified) > 0 && len(verified[0]) > 1 {
+			chain.issuer = verified[0][1]
+		}
 	}
+	return nil
 }

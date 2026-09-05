@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/catay/tlsctl/internal/output"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/output"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 	"gopkg.in/yaml.v3"
 )
 
@@ -62,12 +62,10 @@ func testTargetResults() []targetResult {
 	chains := testChains()
 	return []targetResult{
 		{
-			index:    0,
 			endpoint: "a.example.com:443",
 			chain:    chains[0],
 		},
 		{
-			index:    1,
 			endpoint: "missing.example.com:443",
 			err:      assertError("connection failed"),
 		},
@@ -98,15 +96,16 @@ func TestRenderChains_MultiJSON(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var result []tlsquery.ChainInfo
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+	var envelope output.BatchEnvelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal JSON array: %v", err)
 	}
+	result := envelope.Results
 	if len(result) != 2 {
 		t.Errorf("expected 2 chains, got %d", len(result))
 	}
 	for i, r := range result {
-		if len(r.Certificates) > 0 && r.Certificates[0].PEM != "" {
+		if len(r.Result.Certificates) > 0 && r.Result.Certificates[0].PEM != "" {
 			t.Errorf("chain %d: PEM should be stripped in JSON output", i)
 		}
 	}
@@ -121,10 +120,11 @@ func TestRenderChains_MultiYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var result []tlsquery.ChainInfo
-	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
+	var envelope output.BatchEnvelope
+	if err := yaml.Unmarshal(buf.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal YAML array: %v", err)
 	}
+	result := envelope.Results
 	if len(result) != 2 {
 		t.Errorf("expected 2 chains, got %d", len(result))
 	}
@@ -174,8 +174,8 @@ func TestRenderChains_MultiCSVFull(t *testing.T) {
 	if rows[0][0] != "target" {
 		t.Fatalf("expected CSV full header row, got %q", rows[0][0])
 	}
-	if rows[1][2] != "leaf" || rows[2][2] != "leaf" {
-		t.Fatalf("expected leaf certificate rows, got %q and %q", rows[1][2], rows[2][2])
+	if rows[1][5] != "leaf" || rows[2][5] != "leaf" {
+		t.Fatalf("expected leaf certificate rows, got %q and %q", rows[1][5], rows[2][5])
 	}
 }
 
@@ -188,11 +188,14 @@ func TestRenderChains_SingleJSON(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var result tlsquery.ChainInfo
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+	var envelope output.BatchEnvelope
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal single JSON object: %v", err)
 	}
-	if result.Certificates[0].PEM != "" {
+	if len(envelope.Results) != 1 {
+		t.Fatalf("expected one result: %+v", envelope)
+	}
+	if envelope.Results[0].Result.Certificates[0].PEM != "" {
 		t.Error("PEM should be stripped from JSON output")
 	}
 }
@@ -226,68 +229,11 @@ func TestRenderChains_RawNoSeparator(t *testing.T) {
 	}
 }
 
-func TestRenderTargetResults_MultiJSONLegacy(t *testing.T) {
-	results := testTargetResults()
-	var buf bytes.Buffer
-
-	renderedErrors, err := renderTargetResults(&buf, output.FormatJSON, results, output.Options{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if renderedErrors {
-		t.Fatal("expected format-version 1 JSON output to keep runtime errors out of structured stdout")
-	}
-
-	var got tlsquery.ChainInfo
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("failed to unmarshal legacy JSON object: %v", err)
-	}
-	if len(got.Certificates) != 1 {
-		t.Fatalf("expected one successful chain in v1 JSON output, got %+v", got)
-	}
-	if got.Certificates[0].PEM != "" {
-		t.Error("PEM should be stripped from JSON output")
-	}
-}
-
-func TestRenderTargetResults_MultiCSVLegacy(t *testing.T) {
-	results := testTargetResults()
-	var buf bytes.Buffer
-
-	renderedErrors, err := renderTargetResults(&buf, output.FormatCSV, results, output.Options{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if renderedErrors {
-		t.Fatal("expected format-version 1 CSV output to keep runtime errors out of structured stdout")
-	}
-
-	rows, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
-	if err != nil {
-		t.Fatalf("failed to parse legacy CSV output: %v", err)
-	}
-	if len(rows) != 2 {
-		t.Fatalf("expected header plus one successful row, got %d rows", len(rows))
-	}
-	if rows[0][0] != "target" || rows[0][1] != "tls_version" {
-		t.Fatalf("unexpected legacy CSV headers: %v", rows[0][:2])
-	}
-	if rows[0][1] != "tls_version" || rows[0][2] != "cipher_suite" || rows[0][3] != "alpn" || rows[0][4] != "common_name" {
-		t.Fatalf("unexpected legacy CSV negotiated tls headers: %v", rows[0][:5])
-	}
-	if rows[1][0] != "a.example.com:443" {
-		t.Fatalf("unexpected successful CSV row: %v", rows[1])
-	}
-	if rows[1][1] != "TLS 1.3" || rows[1][2] != "TLS_AES_128_GCM_SHA256" || rows[1][3] != "h2" {
-		t.Fatalf("unexpected negotiated tls values in successful CSV row: %v", rows[1][:4])
-	}
-}
-
-func TestRenderTargetResults_SingleJSONBatchV2(t *testing.T) {
+func TestRenderTargetResults_SingleJSONBatch(t *testing.T) {
 	results := testTargetResults()[:1]
 	var buf bytes.Buffer
 
-	renderedErrors, err := renderTargetResults(&buf, output.FormatJSON, results, output.Options{FormatVersion: 2})
+	renderedErrors, err := renderTargetResults(&buf, output.FormatJSON, results, output.Options{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,11 +259,11 @@ func TestRenderTargetResults_SingleJSONBatchV2(t *testing.T) {
 	}
 }
 
-func TestRenderTargetResults_MultiCSVBatchV2(t *testing.T) {
+func TestRenderTargetResults_MultiCSVBatch(t *testing.T) {
 	results := testTargetResults()
 	var buf bytes.Buffer
 
-	renderedErrors, err := renderTargetResults(&buf, output.FormatCSV, results, output.Options{FormatVersion: 2})
+	renderedErrors, err := renderTargetResults(&buf, output.FormatCSV, results, output.Options{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

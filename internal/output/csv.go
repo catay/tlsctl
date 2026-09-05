@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 type CSVRenderer struct{}
@@ -15,11 +15,11 @@ type CSVRenderer struct{}
 type CSVFullRenderer struct{}
 
 func (CSVRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
-	return renderCSVSummary(w, []*tlsquery.ChainInfo{chain}, opts)
+	return renderCSVSummaryBatch(w, resultsFromChains([]*tlsquery.ChainInfo{chain}), opts)
 }
 
 func (CSVRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
-	return renderCSVSummary(w, chains, opts)
+	return renderCSVSummaryBatch(w, resultsFromChains(chains), opts)
 }
 
 func (CSVRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options) error {
@@ -27,56 +27,15 @@ func (CSVRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options
 }
 
 func (CSVFullRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
-	return renderCSVFull(w, []*tlsquery.ChainInfo{chain})
+	return renderCSVFullBatch(w, resultsFromChains([]*tlsquery.ChainInfo{chain}), opts)
 }
 
 func (CSVFullRenderer) RenderAll(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
-	return renderCSVFull(w, chains)
+	return renderCSVFullBatch(w, resultsFromChains(chains), opts)
 }
 
 func (CSVFullRenderer) RenderBatch(w io.Writer, results []TargetResult, opts Options) error {
 	return renderCSVFullBatch(w, results, opts)
-}
-
-func renderCSVSummary(w io.Writer, chains []*tlsquery.ChainInfo, opts Options) error {
-	headers := []string{
-		csvInputHeader(chains),
-		"tls_version",
-		"cipher_suite",
-		"alpn",
-		"common_name",
-		"issuer",
-		"not_before",
-		"not_after",
-		"days_remaining",
-		"sha256",
-		"subject_alternative_names",
-	}
-
-	writer := csv.NewWriter(w)
-	if err := writer.Write(headers); err != nil {
-		return err
-	}
-
-	for _, chain := range chains {
-		if chain == nil {
-			continue
-		}
-		leaf, err := chain.Leaf()
-		if err != nil {
-			return err
-		}
-		record, err := csvSummaryRow(chain, leaf, opts)
-		if err != nil {
-			return err
-		}
-		if err := writer.Write(record); err != nil {
-			return err
-		}
-	}
-
-	writer.Flush()
-	return writer.Error()
 }
 
 func renderCSVSummaryBatch(w io.Writer, results []TargetResult, opts Options) error {
@@ -144,29 +103,6 @@ func csvSummaryBatchRow(result TargetResult, opts Options) ([]string, error) {
 	return append(record, summary[1:]...), nil
 }
 
-func renderCSVFull(w io.Writer, chains []*tlsquery.ChainInfo) error {
-	headers := csvFullHeaders(csvInputHeader(chains))
-
-	writer := csv.NewWriter(w)
-	if err := writer.Write(headers); err != nil {
-		return err
-	}
-
-	for _, chain := range chains {
-		if chain == nil {
-			continue
-		}
-		for certIndex := range chain.Certificates {
-			if err := writer.Write(csvFullRow(certIndex, chain, &chain.Certificates[certIndex])); err != nil {
-				return err
-			}
-		}
-	}
-
-	writer.Flush()
-	return writer.Error()
-}
-
 func renderCSVFullBatch(w io.Writer, results []TargetResult, opts Options) error {
 	headers := append(csvBatchPrefixHeaders(opts), csvFullHeaders("target")[1:]...)
 
@@ -214,26 +150,11 @@ func csvSummaryBatchHeaders(opts Options) []string {
 }
 
 func csvBatchPrefixHeaders(opts Options) []string {
-	if opts.FormatVersionOrDefault() >= 2 {
-		return []string{"target", "status", "tls_status", "error"}
-	}
-	return []string{"target", "ok", "error"}
+	return []string{"target", "status", "tls_status", "error"}
 }
 
 func csvSummaryBatchPrefix(result TargetResult, opts Options) []string {
-	if opts.FormatVersionOrDefault() >= 2 {
-		return []string{
-			result.Target,
-			string(result.Status()),
-			string(result.TLSStatus(opts)),
-			result.Error,
-		}
-	}
-	return []string{
-		result.Target,
-		strconv.FormatBool(result.OK()),
-		result.Error,
-	}
+	return []string{result.Target, string(result.Status()), string(result.TLSStatus(opts)), result.Error}
 }
 
 func csvFullHeaders(inputHeader string) []string {
@@ -277,10 +198,6 @@ func csvFullHeaders(inputHeader string) []string {
 		"revocation_status",
 		"revocation_checked_at",
 	}
-}
-
-func csvFullRow(certIndex int, chain *tlsquery.ChainInfo, cert *tlsquery.CertInfo) []string {
-	return append([]string{csvInputValue(chain)}, csvFullFieldsRow(certIndex, chain, cert)...)
 }
 
 func csvFullFieldsRow(certIndex int, chain *tlsquery.ChainInfo, cert *tlsquery.CertInfo) []string {
@@ -341,31 +258,6 @@ func csvFullFieldsRow(certIndex int, chain *tlsquery.ChainInfo, cert *tlsquery.C
 		revocationStatus,
 		revocationCheckedAt,
 	}
-}
-
-func csvInputHeader(chains []*tlsquery.ChainInfo) string {
-	if len(chains) == 0 {
-		return "input"
-	}
-
-	header := ""
-	for _, chain := range chains {
-		if chain == nil || chain.InputLabel == "" {
-			return "input"
-		}
-		if header == "" {
-			header = chain.InputLabel
-			continue
-		}
-		if chain.InputLabel != header {
-			return "input"
-		}
-	}
-
-	if header == "" {
-		return "input"
-	}
-	return header
 }
 
 func csvInputValue(chain *tlsquery.ChainInfo) string {

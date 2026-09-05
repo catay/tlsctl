@@ -2,87 +2,57 @@ name: Tag and Release
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - VERSION
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: tlsctl-release
+  cancel-in-progress: false
+
 jobs:
-  tag:
+  release:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag_created: ${{ steps.create_tag.outputs.created }}
     steps:
-      - name: Checkout with full history
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Read version from VERSION file
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Validate version and existing tag
         id: version
         run: |
-          if [ ! -f VERSION ]; then
-            echo "ERROR: VERSION file not found"
+          release_version=$(tr -d '[:space:]' < VERSION)
+          if ! [[ "$release_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid release version: $release_version" >&2
             exit 1
           fi
-          VERSION=$(cat VERSION | tr -d '[:space:]')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Read version: $VERSION"
-
-      - name: Validate SemVer format
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "ERROR: Invalid version format '$VERSION'"
-            echo "Version must be valid SemVer: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
-            exit 1
+          tag="v$release_version"
+          if git rev-parse --verify "refs/tags/$tag" >/dev/null 2>&1; then
+            test "$(git rev-parse "$tag^{commit}")" = "$GITHUB_SHA" || {
+              echo "Tag $tag belongs to a different commit" >&2
+              exit 1
+            }
           fi
-          echo "Version '$VERSION' is valid SemVer"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Create and push tag
-        id: create_tag
+      - name: Check formatting
+        run: make check-fmt
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
+
+      - name: Test and scan
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag '$TAG' already exists, skipping tag creation"
-            echo "created=false" >> "$GITHUB_OUTPUT"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
-            echo "Created and pushed tag: $TAG"
-            echo "created=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  test:
-    needs: tag
-    if: needs.tag.outputs.tag_created == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-
-      - run: go test ./...
-
-  release:
-    needs: [tag, test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
+          make test
+          make vuln
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -90,15 +60,57 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Validate release artifacts before tagging
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          args: release --snapshot --clean --skip publish
+
+      - name: Validate source container
+        run: |
+          docker build -t tlsctl:release-check .
+          docker run --rm tlsctl:release-check version
+          docker run --rm --platform linux/amd64 cataybe/tlsctl:latest-amd64 version
+
+      - name: Create tag or resume the same release
+        id: tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" = false ]; then
+            echo "Release $RELEASE_TAG is already published"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Log in to Docker Hub
+        if: steps.tag.outputs.publish == 'true'
         uses: docker/login-action@v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: goreleaser/goreleaser-action@v7
+      - name: Publish release
+        if: steps.tag.outputs.publish == 'true'
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish completed draft
+        if: steps.tag.outputs.publish == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$RELEASE_TAG" --draft=false

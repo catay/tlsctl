@@ -266,6 +266,7 @@ func TestResolveProxy(t *testing.T) {
 			} else {
 				if u == nil {
 					t.Fatal("expected non-nil proxy URL")
+					return
 				}
 				if u.Host != tt.wantHost {
 					t.Errorf("expected host %q, got %q", tt.wantHost, u.Host)

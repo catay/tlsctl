@@ -1,6 +1,7 @@
 package revocation
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -33,6 +34,7 @@ type Result struct {
 }
 
 type Options struct {
+	Context  context.Context
 	Methods  []Method
 	Timeout  time.Duration
 	SoftFail bool

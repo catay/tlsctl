@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catay/tlsctl/internal/revocation"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/revocation"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 func TestSetExitCode(t *testing.T) {
@@ -62,8 +62,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: true,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2027-01-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2027-01-01T00:00:00Z",
 				}},
 			},
 			expected: ExitOK,
@@ -73,8 +74,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: false,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2027-01-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2027-01-01T00:00:00Z",
 				}},
 			},
 			expected: ExitInsecure,
@@ -84,8 +86,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: true,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2026-07-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2026-07-01T00:00:00Z",
 				}},
 			},
 			expected: ExitExpiring,
@@ -95,8 +98,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: true,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2025-01-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2025-01-01T00:00:00Z",
 				}},
 			},
 			expected: ExitInsecure,
@@ -106,8 +110,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: true,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2027-01-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2027-01-01T00:00:00Z",
 					Revocation: &revocation.Info{
 						OverallStatus: revocation.StatusRevoked,
 					},
@@ -120,8 +125,9 @@ func TestUpdateExitCodeForChain(t *testing.T) {
 			chain: &tlsquery.ChainInfo{
 				Verified: true,
 				Certificates: []tlsquery.CertInfo{{
-					Type:     "leaf",
-					NotAfter: "2027-01-01T00:00:00Z",
+					Type:      "leaf",
+					NotBefore: "2024-01-01T00:00:00Z",
+					NotAfter:  "2027-01-01T00:00:00Z",
 					Revocation: &revocation.Info{
 						OverallStatus: revocation.StatusError,
 					},

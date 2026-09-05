@@ -6,21 +6,29 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catay/tlsctl/internal/revocation"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/revocation"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 	"github.com/fatih/color"
 )
 
 type VerboseTextRenderer struct{}
 
 func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts Options) error {
-	if !chain.Verified {
-		reason := chain.VerificationError
-		if reason == "" {
-			reason = "unverified"
-		}
-		fmt.Fprintf(w, "%s Certificate verification failed: %s\n\n", color.YellowString("⚠"), reason)
+	out := &checkedWriter{writer: w}
+	w = out
+	if chain.InputName != "" {
+		fmt.Fprintf(w, "%s: %s\n", inputLabel(chain), chain.InputName)
 	}
+	health := chain.Health(opts.NowFunc(), opts.WarningDays())
+	fmt.Fprintf(w, "Status: %s", health.Status)
+	if health.Reason != "" {
+		fmt.Fprintf(w, " (%s)", chain.VerificationError)
+	}
+	fmt.Fprintln(w)
+	if !chain.Verified {
+		fmt.Fprintf(w, "%s Certificate verification failed: %s\n", color.YellowString("⚠"), health.Reason)
+	}
+	fmt.Fprintln(w)
 	if chain.NegotiatedTLS != nil {
 		fmt.Fprintf(w, "Negotiated TLS Version: %s\n", chain.NegotiatedTLS.TLSVersion)
 		fmt.Fprintf(w, "Negotiated Cipher Suite: %s\n", chain.NegotiatedTLS.CipherSuite)
@@ -63,12 +71,14 @@ func (VerboseTextRenderer) Render(w io.Writer, chain *tlsquery.ChainInfo, opts O
 			renderRevocation(w, cert.Revocation)
 		}
 	}
-	return nil
+	return out.err
 }
 
 func renderCertFields(w io.Writer, cert *tlsquery.CertInfo) {
 	fmt.Fprintf(w, "[%s]\n", strings.ToUpper(cert.Type))
 	fmt.Fprintf(w, "Version:               %d\n", cert.Version)
+	fmt.Fprintf(w, "SHA-256 Fingerprint:   %s\n", cert.Fingerprint.SHA256)
+	fmt.Fprintf(w, "SHA-1 Fingerprint:     %s\n", cert.Fingerprint.SHA1)
 	fmt.Fprintf(w, "Serial Number:         %s\n", cert.SerialNumber)
 	fmt.Fprintf(w, "Signature Algorithm:   %s\n", cert.SignatureAlgorithm)
 	fmt.Fprintf(w, "Issuer:                %s\n", cert.Issuer)
@@ -87,7 +97,11 @@ func renderCertFields(w io.Writer, cert *tlsquery.CertInfo) {
 	}
 	if cert.BasicConstraints != nil {
 		if cert.BasicConstraints.IsCA {
-			fmt.Fprintf(w, "Basic Constraints:     CA:TRUE, pathlen:%d\n", cert.BasicConstraints.MaxPathLen)
+			if cert.BasicConstraints.MaxPathLen >= 0 {
+				fmt.Fprintf(w, "Basic Constraints:     CA:TRUE, pathlen:%d\n", cert.BasicConstraints.MaxPathLen)
+			} else {
+				fmt.Fprintln(w, "Basic Constraints:     CA:TRUE")
+			}
 		} else {
 			fmt.Fprintf(w, "Basic Constraints:     CA:FALSE\n")
 		}

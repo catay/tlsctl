@@ -58,5 +58,8 @@ release:
   github:
     owner: catay
     name: tlsctl
-  draft: false
+  draft: true
+  use_existing_draft: true
+  replace_existing_artifacts: true
+  mode: replace
   prerelease: auto

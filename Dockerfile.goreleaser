@@ -2,6 +2,8 @@ FROM alpine:3.24
 
 ARG TARGETPLATFORM
 
+RUN apk add --no-cache ca-certificates
+
 RUN set -eux; addgroup -g 6666 tlsctl && adduser -u 6666 -G tlsctl -D -H tlsctl
 
 COPY ${TARGETPLATFORM}/tlsctl /usr/bin/tlsctl

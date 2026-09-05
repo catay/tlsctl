@@ -1,857 +1,446 @@
+# tlsctl
 
 [![CI](https://github.com/catay/tlsctl/actions/workflows/ci.yaml/badge.svg)](https://github.com/catay/tlsctl/actions/workflows/ci.yaml)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/catay/tlsctl)](https://github.com/catay/tlsctl/blob/main/go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/catay/tlsctl)](https://goreportcard.com/report/github.com/catay/tlsctl)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/catay/tlsctl/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/catay/tlsctl)](https://github.com/catay/tlsctl/releases/latest)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<h1>
-<p align="center">
-  <img src="images/tlsctl-192x192.png" alt="tlsctl logo" width="192" height="192">
-  <br>tlsctl
-</p>
-</h1>
+<p align="center"><img src="images/tlsctl-192x192.png" alt="tlsctl logo" width="192" height="192"></p>
 
-## Table of Contents
+Inspect TLS certificates from endpoints, PEM files, or stdin. See certificate
+trust, expiry, revocation, and negotiated TLS details in your terminal, or export
+the same results as JSON, YAML, or CSV.
 
-- [About](#about)
-- [Why tlsctl?](#why-tlsctl)
+**Release preparation:** This README targets 2.0.0. The versioned downloads and
+Docker images below become available after the separately approved release is
+published.
+
+**Upgrading from 1.x?** Version 2.0.0 changes structured output for both `client`
+and `pem` and removes `--format-version`. Read the
+[migration notes](#migrating-from-1x) before updating scripts.
+
+## Table of contents
+
 - [Installation](#installation)
+  - [Pre-built binaries](#pre-built-binaries)
+  - [Build from source](#build-from-source)
+  - [Docker](#docker)
 - [Quick start](#quick-start)
-- [Basic usage](#basic-usage)
-- [Advanced usage](#advanced-usage)
-- [Output formats](#output-formats)
-- [Exit codes](#exit-codes)
-- [Status indicators](#status-indicators)
-- [Quiet mode](#quiet-mode)
-- [Disabling color](#disabling-color)
-- [Configuration file](#configuration-file)
-- [Revocation checking](#revocation-checking)
-- [Certificate fields](#certificate-fields)
-- [Testing with badssl.com](#testing-with-badsslcom)
-- [Shell completion](#shell-completion)
+- [Output and exit codes](#output-and-exit-codes)
+- [Connection and certificate checks](#connection-and-certificate-checks)
+  - [PEM verification](#pem-verification)
+  - [Revocation policy](#revocation-policy)
+  - [TLS probes](#tls-probes)
+- [Configuration](#configuration)
+- [Color and completion](#color-and-completion)
+- [Migrating from 1.x](#migrating-from-1x)
+- [Development](#development)
 - [License](#license)
-
-## About
-
-**tlsctl** is a fast, zero-config command-line tool for inspecting TLS certificates from remote endpoints or local PEM files. Get instant visibility into certificate chains, expiry status, revocation state, and more — all from your terminal.
-
-```
-$ tlsctl client github.com
-github.com (secure, expires in 84 days) ✓
-  Subject:  CN=github.com
-  Issuer:   CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB
-  Validity: 2026-03-06 → 2026-06-03
-  SANs:     github.com, www.github.com
-
-  Chain: github.com → Sectigo Public Server Authentication CA DV E36 → Sectigo Public Server Authentication Root E46 (3 certificates)
-```
-
-## Why tlsctl?
-
-- **Instant insights** — One command shows certificate status, chain, SANs, and expiry at a glance
-- **Multiple output formats** — Human-readable, JSON, YAML, concise CSV, full CSV, verbose text, or raw PEM
-- **Revocation checking** — Built-in CRL and OCSP support to detect revoked certificates
-- **PEM file parsing** — Inspect local certificate files with the same rich output
-- **Custom CA support** — Validate against private CAs with `--cacert`
-- **STARTTLS** — Upgrade plaintext connections for SMTP, IMAP, POP3, and LDAP with `--starttls`
-- **SNI override** — Set a custom server name with `--servername` for IP-based targets with virtual hosts
-- **Proxy aware** — Connect through HTTP proxies with `--proxy` or environment variables
-- **Cross-platform** — Pre-built binaries for Linux, macOS, and Windows (amd64 & arm64)
-- **Lightweight** — Single static binary, no runtime dependencies
 
 ## Installation
 
-### Pre-built binaries (recommended)
+### Pre-built binaries
 
-Download the latest release for your platform from the [GitHub Releases](https://github.com/catay/tlsctl/releases/latest) page.
+Download an archive and `checksums.txt` from
+[GitHub Releases](https://github.com/catay/tlsctl/releases).
 
-| Platform       | Architecture | Archive |
-|----------------|-------------|---------|
-| Linux          | amd64       | [`tlsctl_1.2.0_linux_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_linux_amd64.tar.gz) |
-| Linux          | arm64       | [`tlsctl_1.2.0_linux_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_linux_arm64.tar.gz) |
-| macOS          | amd64       | [`tlsctl_1.2.0_darwin_amd64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_darwin_amd64.tar.gz) |
-| macOS          | arm64       | [`tlsctl_1.2.0_darwin_arm64.tar.gz`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_darwin_arm64.tar.gz) |
-| Windows        | amd64       | [`tlsctl_1.2.0_windows_amd64.zip`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_windows_amd64.zip) |
-| Windows        | arm64       | [`tlsctl_1.2.0_windows_arm64.zip`](https://github.com/catay/tlsctl/releases/download/v1.2.0/tlsctl_1.2.0_windows_arm64.zip) |
+| Platform | Architecture | Archive |
+| --- | --- | --- |
+| Linux | amd64 | [tlsctl_2.0.0_linux_amd64.tar.gz](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_linux_amd64.tar.gz) |
+| Linux | arm64 | [tlsctl_2.0.0_linux_arm64.tar.gz](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_linux_arm64.tar.gz) |
+| macOS | amd64 | [tlsctl_2.0.0_darwin_amd64.tar.gz](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_darwin_amd64.tar.gz) |
+| macOS | arm64 | [tlsctl_2.0.0_darwin_arm64.tar.gz](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_darwin_arm64.tar.gz) |
+| Windows | amd64 | [tlsctl_2.0.0_windows_amd64.zip](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_windows_amd64.zip) |
+| Windows | arm64 | [tlsctl_2.0.0_windows_arm64.zip](https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_windows_arm64.zip) |
+
+Linux amd64 installation, in an empty working directory:
 
 ```bash
-# Example: install on Linux amd64
-curl -sL https://github.com/catay/tlsctl/releases/latest/download/tlsctl_1.2.0_linux_amd64.tar.gz | tar xz
-sudo mv tlsctl /usr/local/bin/
+curl -fLO https://github.com/catay/tlsctl/releases/download/v2.0.0/tlsctl_2.0.0_linux_amd64.tar.gz
+curl -fLO https://github.com/catay/tlsctl/releases/download/v2.0.0/checksums.txt
+sha256sum --check --ignore-missing checksums.txt
+# Continue only if checksum verification succeeds.
+tar -xzf tlsctl_2.0.0_linux_amd64.tar.gz
+sudo install -m 755 tlsctl /usr/local/bin/tlsctl
+tlsctl version
 ```
+
+On macOS, compare `shasum -a 256 ARCHIVE` with its entry in `checksums.txt`.
+On Windows, use `Get-FileHash ARCHIVE -Algorithm SHA256`.
 
 ### Build from source
 
-Requires [Go 1.25](https://go.dev/dl/) or later.
+Requires Go **1.26.8 or later**. Use a current patched toolchain for a TLS tool.
 
 ```bash
 git clone https://github.com/catay/tlsctl.git
 cd tlsctl
-make build        # or: go build -o tlsctl .
+make build
+./tlsctl version
 ```
+
+`make build` uses Go and embeds the repository version, commit, and build date.
+A plain `go build -o tlsctl .` also works, with development version metadata.
 
 ### Docker
 
-Pre-built images are published to Docker Hub on every release:
-
 ```bash
-# Pull and run the latest release
-docker run --rm cataybe/tlsctl client github.com
+docker run --rm cataybe/tlsctl:v2.0.0 client example.com
+docker run --rm -v /path/to/chain.pem:/chain.pem:ro cataybe/tlsctl:v2.0.0 pem /chain.pem
+docker run --rm -i cataybe/tlsctl:v2.0.0 pem - < chain.pem
 
-# Use a specific version
-docker run --rm cataybe/tlsctl:v1.2.0 client github.com
-
-# Inspect a local PEM file (mount it into the container)
-docker run --rm -v /path/to/cert.pem:/cert.pem:ro cataybe/tlsctl pem /cert.pem
-```
-
-You can also build the image locally:
-
-```bash
+# Build the source image locally.
 docker build -t tlsctl .
-docker run --rm tlsctl client github.com
+docker run --rm tlsctl version
 ```
+
+Images run as an unprivileged user and include the system CA bundle. Mounted
+files must be readable by that user. The `latest` image tag tracks releases.
 
 ## Quick start
 
 ```bash
-# Inspect any TLS endpoint (port 443 is the default)
+# Inspect an endpoint; the default port is 443.
 tlsctl client example.com
-
-# Inspect multiple endpoints from a file (one per line)
-tlsctl client --file hosts.txt
-
-# Probe supported TLS versions and cipher suites
-tlsctl client --tls-versions example.com
-
-# Show what the default handshake negotiated
-tlsctl client example.com
-
-# Negotiate ALPN explicitly
-tlsctl client --alpn h2,http/1.1 example.com
-
-# Use a custom port
 tlsctl client example.com:8443
 
-# Inspect a local PEM file
-tlsctl pem cert.pem
-```
-
-## Basic usage
-
-### Inspecting valid certificates
-
-```
-$ tlsctl client badssl.com
-*.badssl.com (secure, expires in 40 days) ✓
-  Subject:  CN=*.badssl.com
-  Issuer:   CN=R13,O=Let's Encrypt,C=US
-  Validity: 2026-01-20 → 2026-04-20
-  Handshake: TLS 1.2 / TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-  SANs:     *.badssl.com, badssl.com
-
-  Chain: *.badssl.com → R13 (2 certificates)
-```
-
-### Detecting expired certificates
-
-```
-$ tlsctl client expired.badssl.com
-*.badssl.com (insecure, certificate expired, expired 3985 days ago) ✗
-  Subject:  CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard
-  Issuer:   CN=COMODO RSA Domain Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB
-  Validity: 2015-04-09 → 2015-04-12
-  SANs:     *.badssl.com, badssl.com
-
-  Chain: *.badssl.com → COMODO RSA Domain Validation Secure Server CA → COMODO RSA Certification Authority (3 certificates)
-```
-
-### Detecting hostname mismatches
-
-```
-$ tlsctl client wrong.host.badssl.com
-*.badssl.com (insecure, hostname mismatch, expires in 40 days) ✗
-  Subject:  CN=*.badssl.com
-  Issuer:   CN=R13,O=Let's Encrypt,C=US
-  Validity: 2026-01-20 → 2026-04-20
-  SANs:     *.badssl.com, badssl.com
-
-  Chain: *.badssl.com → R13 (2 certificates)
-```
-
-### Detecting self-signed certificates
-
-```
-$ tlsctl client self-signed.badssl.com
-*.badssl.com (insecure, unknown authority, expires in 729 days) ✗
-  Subject:  CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
-  Issuer:   CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
-  Validity: 2026-03-10 → 2028-03-09
-  SANs:     *.badssl.com, badssl.com
-```
-
-### Detecting untrusted root CAs
-
-```
-$ tlsctl client untrusted-root.badssl.com
-*.badssl.com (insecure, unknown authority, expires in 729 days) ✗
-  Subject:  CN=*.badssl.com,O=BadSSL,L=San Francisco,ST=California,C=US
-  Issuer:   CN=BadSSL Untrusted Root Certificate Authority,O=BadSSL,L=San Francisco,ST=California,C=US
-  Validity: 2026-03-10 → 2028-03-09
-  SANs:     *.badssl.com, badssl.com
-
-  Chain: *.badssl.com → BadSSL Untrusted Root Certificate Authority (2 certificates)
-```
-
-### Detecting incomplete certificate chains
-
-```
-$ tlsctl client incomplete-chain.badssl.com
-*.badssl.com (insecure, incomplete chain, expires in 39 days) ✗
-  Subject:  CN=*.badssl.com
-  Issuer:   CN=R13,O=Let's Encrypt,C=US
-  Validity: 2026-01-20 → 2026-04-20
-  SANs:     *.badssl.com, badssl.com
-```
-
-### Revocation checking with CRL
-
-```
-$ tlsctl client --revocation crl revoked.badssl.com
-revoked.badssl.com (secure, expires in 89 days) ✓
-  Subject:  CN=revoked.badssl.com
-  Issuer:   CN=E8,O=Let's Encrypt,C=US
-  Validity: 2026-03-10 → 2026-06-08
-  SANs:     revoked.badssl.com
-  Revocation: REVOKED (CRL)
-
-  Chain: revoked.badssl.com → E8 (2 certificates)
-```
-
-### Revocation checking with OCSP
-
-```
-$ tlsctl client --revocation ocsp google.com
-*.google.com (secure, expires in 46 days) ✓
-  Subject:  CN=*.google.com
-  Issuer:   CN=WR2,O=Google Trust Services,C=US
-  Validity: 2026-02-02 → 2026-04-27
-  SANs:     *.google.com, *.appengine.google.com, *.bdn.dev, *.origin-test.bdn.dev, *.cloud.google.com (+132 more)
-  Revocation: not revoked (OCSP)
-
-  Chain: *.google.com → WR2 → GTS Root R1 (3 certificates)
-```
-
-### Probing TLS versions and cipher suites
-
-Use `--tls-versions` to probe supported TLS versions and enumerate server-side cipher suites in preferred order:
-
-```
-$ tlsctl client --tls-versions badssl.com
-*.badssl.com (secure, expires in 40 days) ✓
-  Subject:  CN=*.badssl.com
-  Issuer:   CN=R13,O=Let's Encrypt,C=US
-  Validity: 2026-01-20 → 2026-04-20
-  SANs:     *.badssl.com, badssl.com
-  TLS:      TLS 1.0, TLS 1.1, TLS 1.2
-  Ciphers (TLS 1.0):
-    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
-    TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
-    ...
-  Ciphers (TLS 1.1):
-    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
-    TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
-    ...
-  Ciphers (TLS 1.2):
-    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-    ...
-
-  Chain: *.badssl.com → R13 (2 certificates)
-```
-
-For TLS 1.0–1.2, cipher suites are enumerated by performing repeated handshakes to
-determine the server's full preference order. For TLS 1.3, only the negotiated cipher
-suite is reported because Go's `crypto/tls` does not allow configuring TLS 1.3 cipher
-suites individually.
-
-In human output, insecure cipher suites are highlighted in red and tagged with `(insecure)`.
-In non-human outputs (`json`, `yaml`, `csv-full`, and `text`), cipher suites are split into
-`secure_cipher_suites` and `insecure_cipher_suites`.
-
-### Showing negotiated handshake details
-
-The human-readable client output always shows the negotiated TLS version, cipher suite, and,
-when present, ALPN for the default connection. If you want ALPN to be negotiated, advertise
-protocols with `--alpn`:
-
-```
-$ tlsctl client --alpn h2,http/1.1 github.com
-github.com (secure, expires in 84 days) ✓
-  Subject:  CN=github.com
-  Issuer:   CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB
-  Validity: 2026-03-06 → 2026-06-03
-  Handshake: TLS 1.3 / TLS_AES_128_GCM_SHA256 / h2
-  SANs:     github.com, www.github.com
-
-  Chain: github.com → Sectigo Public Server Authentication CA DV E36 → Sectigo Public Server Authentication Root E46 (3 certificates)
-```
-
-Structured client outputs include the same data under `negotiated_tls` by default.
-
-`--alpn` accepts a comma-separated list such as `h2,http/1.1` and forwards it to the TLS client
-handshake as the advertised ALPN protocol list.
-
-### Verbose text output
-
-Use `-o text` for the full certificate details:
-
-```
-$ tlsctl client -o text badssl.com
-[LEAF]
-Version:               3
-Serial Number:         06:17:1e:8f:ca:26:0a:2a:33:19:4f:1b:e5:a7:75:e1:c5:ed
-Signature Algorithm:   SHA256-RSA
-Issuer:                CN=R13,O=Let's Encrypt,C=US
-Subject:               CN=*.badssl.com
-Not Before:            2026-01-20T20:02:51Z
-Not After:             2026-04-20T20:02:50Z
-Public Key Algorithm:  RSA
-Key Length:            2048 bits
-Key Usage:             Digital Signature, Key Encipherment
-Extended Key Usage:    TLS Web Server Authentication, TLS Web Client Authentication
-Basic Constraints:     CA:FALSE
-Subject Key ID:        2F:70:81:3B:C8:46:E1:26:35:CD:23:DB:C7:65:DA:30:CE:90:E7:44
-Authority Key ID:      E7:AB:9F:0F:2C:33:A0:53:D3:5E:4F:78:C8:B2:84:0E:3B:D6:92:33
-Subject Alt Names:     *.badssl.com, badssl.com
-CA Issuers:            http://r13.i.lencr.org/
-CRL Distribution:      http://r13.c.lencr.org/110.crl
-
-[INTERMEDIATE]
-Version:               3
-Serial Number:         5a:00:f2:12:d8:d4:b4:80:f3:92:41:57:ea:29:83:05
-Signature Algorithm:   SHA256-RSA
-Issuer:                CN=ISRG Root X1,O=Internet Security Research Group,C=US
-Subject:               CN=R13,O=Let's Encrypt,C=US
-Not Before:            2024-03-13T00:00:00Z
-Not After:             2027-03-12T23:59:59Z
-Public Key Algorithm:  RSA
-Key Length:            2048 bits
-Key Usage:             Digital Signature, Certificate Sign, CRL Sign
-Extended Key Usage:    TLS Web Client Authentication, TLS Web Server Authentication
-Basic Constraints:     CA:TRUE, pathlen:0
-Subject Key ID:        E7:AB:9F:0F:2C:33:A0:53:D3:5E:4F:78:C8:B2:84:0E:3B:D6:92:33
-Authority Key ID:      79:B4:59:E6:7B:B6:E5:E4:01:73:80:08:88:C8:1A:58:F6:E9:9B:6E
-CA Issuers:            http://x1.i.lencr.org/
-CRL Distribution:      http://x1.c.lencr.org/
-```
-
-### JSON output
-
-Use `-o json` for machine-readable structured output:
-
-```bash
-$ tlsctl client -o json badssl.com
-```
-
-```json
-{
-  "negotiated_tls": {
-    "tls_version": "TLS 1.3",
-    "cipher_suite": "TLS_AES_128_GCM_SHA256",
-    "alpn": "h2"
-  },
-  "certificates": [
-    {
-      "type": "leaf",
-      "version": 3,
-      "serial_number": "06:17:1e:8f:ca:26:0a:2a:33:19:4f:1b:e5:a7:75:e1:c5:ed",
-      "signature_algorithm": "SHA256-RSA",
-      "issuer": "CN=R13,O=Let's Encrypt,C=US",
-      "subject": "CN=*.badssl.com",
-      "common_name": "*.badssl.com",
-      "not_before": "2026-01-20T20:02:51Z",
-      "not_after": "2026-04-20T20:02:50Z",
-      "public_key_algorithm": "RSA",
-      "key_length": 2048,
-      "key_usage": ["Digital Signature", "Key Encipherment"],
-      "extended_key_usage": ["TLS Web Server Authentication", "TLS Web Client Authentication"],
-      "subject_alternative_names": ["*.badssl.com", "badssl.com"],
-      "fingerprint": {
-        "sha1": "71:03:e9:e6:7c:f1:0e:e0:a7:29:28:fe:85:49:a6:4f:e5:66:e0:48",
-        "sha256": "b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:..."
-      }
-    }
-  ],
-  "verified": true
-}
-```
-
-With the default `--format-version 1`, single-target and multi-target output both preserve the legacy schema. For multiple targets, structured stdout contains only successful results and per-target runtime failures are still reported on stderr.
-
-Use `--format-version 2` if you want the same envelope for both single-target and multi-target client output:
-
-```bash
-$ tlsctl client -o json --format-version 2 github.com missing.example.com
-```
-
-```json
-{
-  "status": "partial_success",
-  "summary": {
-    "total": 2,
-    "succeeded": 1,
-    "failed": 1
-  },
-  "results": [
-    {
-      "target": "github.com:443",
-      "status": "success",
-      "tls_status": "secure",
-      "result": {
-        "negotiated_tls": {
-          "tls_version": "TLS 1.3",
-          "cipher_suite": "TLS_AES_128_GCM_SHA256",
-          "alpn": "h2"
-        },
-        "certificates": [
-          {
-            "type": "leaf",
-            "common_name": "github.com"
-          }
-        ],
-        "verified": true
-      }
-    },
-    {
-      "target": "missing.example.com:443",
-      "status": "failure",
-      "error": "connection failed: dial tcp: lookup missing.example.com: no such host"
-    }
-  ]
-}
-```
-
-When `--tls-versions` is enabled, each `tls_versions` entry includes:
-
-```json
-{
-  "version": "TLS 1.2",
-  "cipher_suites": ["..."],
-  "secure_cipher_suites": ["..."],
-  "insecure_cipher_suites": ["..."]
-}
-```
-
-### YAML output
-
-Use `-o yaml` for YAML-formatted output:
-
-```bash
-$ tlsctl client -o yaml badssl.com
-```
-
-```yaml
-certificates:
-  - type: leaf
-    version: 3
-    serial_number: 06:17:1e:8f:ca:26:0a:2a:33:19:4f:1b:e5:a7:75:e1:c5:ed
-    signature_algorithm: SHA256-RSA
-    issuer: CN=R13,O=Let's Encrypt,C=US
-    subject: CN=*.badssl.com
-    common_name: '*.badssl.com'
-    not_before: "2026-01-20T20:02:51Z"
-    not_after: "2026-04-20T20:02:50Z"
-    public_key_algorithm: RSA
-    key_length: 2048
-    key_usage:
-      - Digital Signature
-      - Key Encipherment
-    subject_alternative_names:
-      - '*.badssl.com'
-      - badssl.com
-verified: true
-```
-
-With the default `--format-version 1`, YAML also preserves the legacy behavior for both single-target and multi-target runs. Use `--format-version 2` if you want the stable `status` / `summary` / `results` envelope for both single-target and multi-target client output.
-
-In version 2 output, `status` describes whether the query itself succeeded, while `tls_status` describes the TLS health of successful results (`secure`, `expiring`, `insecure`, or `revocation_error`).
-
-### CSV output
-
-Use `-o csv` for a concise, spreadsheet-friendly summary. Single-target output produces one row based on the leaf certificate:
-
-```bash
-$ tlsctl client -o csv badssl.com
-```
-
-```csv
-target,tls_version,cipher_suite,alpn,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
-badssl.com:443,TLS 1.2,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,,*.badssl.com,"CN=R13,O=Let's Encrypt,C=US",2026-01-20T20:02:51Z,2026-04-20T20:02:50Z,90,b4:5a:53:24:32:d9:8f:62:b6:ea:f1:47:32:06:10:f1:...,"*.badssl.com; badssl.com"
-```
-
-Use `--format-version 2` with `csv` or `csv-full` if you want failed targets included inline with `status` and `error` columns:
-
-```csv
-target,status,tls_status,error,tls_version,cipher_suite,alpn,common_name,issuer,not_before,not_after,days_remaining,sha256,subject_alternative_names
-github.com:443,success,secure,,TLS 1.3,TLS_AES_128_GCM_SHA256,h2,github.com,"CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",2026-03-06T00:00:00Z,2026-06-03T23:59:59Z,89,ab:cd:ef:...,"github.com; www.github.com"
-missing.example.com:443,failure,,connection failed: dial tcp: lookup missing.example.com: no such host,,,,,,,,,,
-```
-
-Use `-o csv-full` if you want the row-per-certificate export with the wider field set.
-
-### Raw PEM output
-
-Use `-o raw` to extract the PEM-encoded certificates:
-
-```bash
-# Save the certificate chain to a file
-tlsctl client -o raw badssl.com > chain.pem
-
-# Pipe to openssl for further inspection
-tlsctl client -o raw badssl.com | openssl x509 -noout -text
-```
-
-### Custom CA certificate
-
-Use `--cacert` to validate certificates against a private CA:
-
-```bash
-tlsctl client --cacert /path/to/internal-ca.pem internal.example.com
-tlsctl pem --cacert /path/to/ca.pem server-cert.pem
-```
-
-### Proxy support
-
-Connect through an HTTP proxy with `--proxy` (or `-x`):
-
-```bash
-tlsctl client --proxy http://proxy.corp.example.com:8080 example.com
-tlsctl client -x http://proxy:3128 example.com
-```
-
-The `--proxy` flag falls back to `HTTPS_PROXY` / `HTTP_PROXY` environment variables if not set.
-
-### SNI override
-
-Use `--servername` to override the TLS Server Name Indication (SNI) value. This is useful when connecting to an IP address that hosts multiple virtual hosts:
-
-```bash
-tlsctl client --servername example.com 93.184.216.34:443
-```
-
-### STARTTLS support
-
-Use `--starttls` to negotiate a plaintext-to-TLS upgrade before inspecting the certificate. Supported protocols: `smtp`, `imap`, `pop3`, `ldap`.
-
-When `--starttls` is used without an explicit port, the default port for the protocol is used automatically:
-
-| Protocol | Default port |
-|----------|-------------|
-| `smtp`   | 587         |
-| `imap`   | 143         |
-| `pop3`   | 110         |
-| `ldap`   | 389         |
-
-```bash
-# SMTP STARTTLS (connects to port 587 by default)
-tlsctl client --starttls smtp mail.example.com
-
-# SMTP on a custom port
-tlsctl client --starttls smtp mail.example.com:25
-
-# IMAP STARTTLS
-tlsctl client --starttls imap mail.example.com
-
-# POP3 STARTTLS
-tlsctl client --starttls pop3 mail.example.com
-
-# LDAP STARTTLS
-tlsctl client --starttls ldap ldap.example.com
-```
-
-### Connection timeout controls
-
-Use `--connect-timeout` and `--handshake-timeout` to bound client-side network time for direct TLS, proxy CONNECT, and STARTTLS flows.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--connect-timeout` | `5s` | Timeout for establishing the TCP connection |
-| `--handshake-timeout` | `10s` | Timeout for proxy negotiation, STARTTLS, and the TLS handshake |
-
-```bash
-# Faster failure for monitoring and inventory scans
-tlsctl client --connect-timeout 3s --handshake-timeout 5s example.com
-
-# Allow more time for slow STARTTLS services
-tlsctl client --starttls smtp --handshake-timeout 15s mail.example.com
-```
-
-### Parsing PEM files
-
-```bash
-# Parse a single certificate
-tlsctl pem cert.pem
-
-# Parse a certificate chain (multiple certs in one file)
+# Inspect a file or stdin.
 tlsctl pem chain.pem
+tlsctl pem - < chain.pem
 
-# Read PEM data from stdin (use '-' or omit the file argument)
-cat cert.pem | tlsctl pem -
-cat chain.pem | tlsctl pem
+# Query several endpoints, retaining failures in structured output.
+tlsctl client -o json example.com missing.example.invalid
 
-# Fetch a certificate via openssl and inspect it
-echo | openssl s_client -connect github.com:443 2>/dev/null | openssl x509 | tlsctl pem -
+# Read endpoints from a file, with up to eight concurrent targets by default.
+tlsctl client --file hosts.txt --concurrency 8 -o csv
 
-# Inspect a certificate fetched via curl
-curl -s https://example.com/ca.pem | tlsctl pem -
+# Advertise ALPN and inspect the negotiated protocol.
+tlsctl client --alpn h2,http/1.1 example.com
 
-# Verbose output
-tlsctl pem -o text cert.pem
-
-# JSON output
-tlsctl pem -o json cert.pem
-
-# YAML output
-tlsctl pem -o yaml cert.pem
-
-# CRL revocation check on a PEM file
-tlsctl pem --revocation crl cert.pem
+# Inspect SMTP using STARTTLS.
+tlsctl client --starttls smtp mail.example.com
 ```
 
-## Advanced usage
+Human output identifies the input, followed by certificate status, subject,
+issuer, validity, handshake details when available, and the certificate chain.
+Revoked certificates are reported as insecure. Unavailable soft-fail revocation
+checks remain visible as warnings.
 
-The JSON output (`-o json`) pairs well with [jq](https://jqlang.github.io/jq/) for extracting specific fields:
+Inputs are hosts or IP addresses with optional ports, including `[::1]:443`,
+`[::1]`, and `::1`. URLs and paths are rejected. Endpoint files accept blank
+lines and `#` comments. File inputs precede positional targets; results retain
+input order and duplicate targets are retained.
+
+## Output and exit codes
+
+| Format | Flag | Contract |
+| --- | --- | --- |
+| Human | `-o human` (default) | Concise certificate summary |
+| Text | `-o text` | Detailed certificate fields, fingerprints, and check results |
+| JSON | `-o json` | One `status` / `summary` / `results` envelope |
+| YAML | `-o yaml` | The same envelope as JSON |
+| CSV | `-o csv` | One row per input, including failed inputs |
+| CSV-full | `-o csv-full` | One row per certificate; one error row for failed inputs |
+| Raw | `-o raw` | PEM certificates for successful inputs |
+
+There is one structured format contract, shared by `client` and `pem`.
+For PEM, `target` is the filename or `stdin`; all certificates in that input
+belong to one result. JSON and YAML omit the PEM payload itself.
+
+The envelope's `status` is `success`, `partial_success`, or `failure`.
+Per-result `status` describes whether inspection succeeded. A successfully
+inspected certificate can still be invalid: `tls_status` is `secure`,
+`expiring`, `insecure`, or `revocation_error`. Failed inputs have `error`
+and omit `result` and `tls_status`.
 
 ```bash
-# Get the SHA-256 fingerprint of the leaf certificate
-tlsctl client -o json example.com | jq -r '.certificates[] | select(.type == "leaf") | .fingerprint.sha256'
+# Leaf fingerprint for each successfully inspected input.
+tlsctl client -o json example.com |
+  jq -r '.results[] | select(.status == "success") | .result.certificates[0].fingerprint.sha256'
 
-# List all Subject Alternative Names (SANs)
-tlsctl client -o json example.com | jq -r '.certificates[] | select(.type == "leaf") | .subject_alternative_names[]'
+# Endpoint and failure reason.
+tlsctl client --file hosts.txt -o json |
+  jq -r '.results[] | select(.status == "failure") | "\(.target): \(.error)"'
 
-# Show expiry date for each certificate in the chain
-tlsctl client -o json example.com | jq -r '.certificates[] | "\(.type): \(.common_name) expires \(.not_after)"'
-
-# Check if the certificate is verified
-tlsctl client -o json example.com | jq '.verified'
-
-# Extract the issuer and subject of the leaf certificate
-tlsctl client -o json example.com | jq '.certificates[] | select(.type == "leaf") | {subject, issuer}'
-
-# Get serial numbers of all certificates in the chain
-tlsctl client -o json example.com | jq -r '.certificates[] | "\(.type): \(.serial_number)"'
-
-# Count the number of SANs on the leaf certificate
-tlsctl client -o json example.com | jq '.certificates[] | select(.type == "leaf") | .subject_alternative_names | length'
-
-# Check multiple hosts and report their expiry dates with the stable v2 envelope
-tlsctl client -o json --format-version 2 google.com github.com | jq -r '.results[] | select(.status == "success") | .result.certificates[] | select(.type == "leaf") | "\(.common_name) expires \(.not_after)"'
+# Export the chain as PEM.
+tlsctl client -o raw example.com > chain.pem
 ```
 
-## Output formats
+| Exit code | Meaning |
+| --- | --- |
+| `0` | No failing checks or expiry warnings |
+| `1` | Invocation, configuration, connection, input, timeout, or output error |
+| `2` | Invalid, untrusted, expired, not-yet-valid, or revoked certificate |
+| `3` | Required revocation check could not establish a result |
+| `4` | Verified certificate expires within the warning threshold |
 
-| Format | Flag | Description |
-|--------|------|-------------|
-| Human | *(default)* or `-o human` | Brief human-readable summary with color-coded status |
-| Text | `-o text` | Verbose output with all certificate fields |
-| JSON | `-o json` | Full structured JSON, ideal for scripting and automation |
-| YAML | `-o yaml` | Full structured YAML |
-| CSV | `-o csv` | Concise one-row-per-input summary using the leaf certificate |
-| CSV Full | `-o csv-full` | Wide row-per-certificate export for detailed tabular processing |
-| Raw | `-o raw` | PEM-encoded certificates |
+For mixed results, precedence is `1 > 3 > 2 > 4 > 0`; it is not numeric order.
+The expiry threshold defaults to 30 days and can be set with `--expiry-warning`
+(1–10000 days). The comparison uses elapsed time, including the exact threshold;
+displayed days are rounded down for future expiry.
 
-## Exit codes
+Use `--quiet` (`-q`) to suppress stdout and retain exit codes and operational
+errors. Structured modes include per-input errors in stdout; quiet mode instead
+reports them on stderr. Invocation and configuration errors always go to stderr.
+When piping to another command, use your shell's `pipefail` option if you need
+to preserve tlsctl's failure status.
 
-- `0` ok
-- `1` runtime error (e.g., connection or parsing failure)
-- `2` insecure or invalid (unverified, expired, or revoked)
-- `3` revocation error (revocation check failed)
-- `4` expiring soon (certificate expires within 30 days, configurable via `--expiry-warning`)
+`secure` means the certificate passed the applicable trust and validity checks.
+It is not a complete security assessment of the server or its TLS configuration.
+Revocation is checked only when requested. A soft-fail revocation result can leave
+`tls_status` as `secure`; inspect `result.certificates[0].revocation.overall_status`
+to determine whether revocation was established. The chain's `verified` field
+reports certificate verification independently of revocation and expiry warnings.
 
-## Status indicators
-
-The default output uses color-coded status indicators:
-
-| Indicator | Color | Meaning |
-|-----------|-------|---------|
-| `✓` **secure** | Green | Certificate is valid and verified |
-| `⚠` **secure** | Yellow | Certificate is verified but expires within the warning threshold (default: 30 days, configurable via `--expiry-warning`) |
-| `✗` **insecure** | Red | Certificate verification failed (with reason) |
-
-## Quiet mode
-
-Use `-q` or `--quiet` to suppress all informational and warning output. Only error messages are displayed. Exit codes are preserved, making this ideal for scripting and monitoring:
+## Connection and certificate checks
 
 ```bash
-tlsctl client -q example.com
-echo $?   # 0 = ok, 2 = insecure, 4 = expiring soon, etc.
+# Add private CAs to system trust.
+tlsctl client --cacert private-ca.pem internal.example.com
+tlsctl pem --cacert private-ca.pem chain.pem
+
+# Override both SNI and the hostname used for certificate verification.
+tlsctl client --servername example.com 192.0.2.1:443
+
+# Set bounds for an entire target and each connection phase.
+tlsctl client --timeout 30s --connect-timeout 3s --handshake-timeout 5s example.com
+
+# Probe TLS versions and cipher suites implemented by Go.
+tlsctl client --tls-versions example.com
+
+# Check revocation, failing when no usable result can be established.
+tlsctl client --revocation ocsp --revocation-soft-fail=false example.com
+
+# Inspect through an HTTP or HTTPS proxy.
+tlsctl client --proxy http://proxy.example.com:8080 example.com
 ```
 
-## Disabling color
+`--timeout` defaults to one minute per target, including TLS probes and
+revocation; it starts when a worker begins that target. `--connect-timeout`
+defaults to 5 seconds per connection. `--handshake-timeout` defaults to 10 seconds
+per proxy negotiation and per STARTTLS/TLS handshake phase. All timeouts must be
+positive. `--concurrency` accepts 1–256 and defaults to 8. Ctrl-C cancels ongoing
+network work.
 
-Use `--no-color` to strip ANSI color codes from output, useful for piping to other tools or log ingestion:
+Supported STARTTLS protocols and default ports are SMTP (587), IMAP (143),
+POP3 (110), and LDAP (389). An explicit port takes precedence.
 
-```bash
-tlsctl client --no-color example.com
-tlsctl client --no-color example.com | tee cert.log
-```
+Without `--proxy`, target connections use `HTTPS_PROXY` and `NO_PROXY`
+(including lowercase variants). There is no `HTTP_PROXY` fallback for target
+TLS connections. Explicit proxies override environment exclusions.
+Revocation HTTP requests independently use the standard HTTP(S) proxy environment
+settings. The explicit `--proxy` flag applies only to target connections.
+Only HTTP and HTTPS CONNECT proxies are supported; omitted proxy ports default
+to 80 and 443 respectively.
 
-## Configuration file
+### PEM verification
 
-`tlsctl` supports a `settings.json` configuration file for defining default values per subcommand. Configuration values are applied in the following order of precedence:
+Supply the leaf certificate first, followed by intermediates. The first certificate
+determines status and is the subject of any requested revocation check. Other
+certificates in a bundle are displayed but are not verified as separate inputs.
+Included roots do not automatically become trusted; `--cacert` adds certificates
+to system trust.
 
-1. **CLI arguments** (highest priority)
-2. **Subcommand-specific values from `settings.json`**
-3. **Global values from `settings.json`**
-4. **Built-in defaults** (lowest priority)
+PEM verification checks trust and validity without requiring a hostname or a
+particular extended key usage. Client verification also checks the hostname and
+server-authentication usage. Invalid peer certificates remain inspectable: the
+client collects and explicitly verifies them on the same connection without
+sending application data.
 
-### File location
+### Revocation policy
 
-The configuration file is stored in the OS-specific configuration directory:
+Both commands accept `--revocation crl` or `--revocation ocsp`. Checks are
+disabled by default and apply to the primary certificate only.
 
-| Platform | Path |
-|----------|------|
-| Linux    | `$XDG_CONFIG_HOME/tlsctl/settings.json` or `~/.config/tlsctl/settings.json` |
-| macOS    | `~/Library/Application Support/tlsctl/settings.json` |
-| Windows  | `%AppData%\tlsctl\settings.json` |
+| Result | Soft-fail (default) | `--revocation-soft-fail=false` |
+| --- | --- | --- |
+| Usable good response | `good` | `good` |
+| Confirmed revoked response | `revoked`, exit `2` | `revoked`, exit `2` |
+| No usable response | Uncertainty is reported; no failure solely for uncertainty | `error`, exit `3` |
 
-Use `--config <path>` to override the default location:
+Other failures can still determine the exit code. In particular, an exhausted
+client `--timeout` is an input-processing failure, even with soft-fail enabled.
 
-```bash
-tlsctl --config /path/to/settings.json client example.com
-```
+Responders are tried in certificate order until a usable good or revoked result
+is found; failed attempts remain in `revocation.results`. Each request has a
+`--revocation-timeout` of 5 seconds by default and shares the client's overall
+target deadline.
 
-If the default configuration file is missing, `tlsctl` runs with built-in defaults. If `--config` points to a missing file, an error is reported.
+CRLs require the actual issuer, a valid signature, and freshness. Unsupported
+critical CRL extensions are rejected. OCSP delegated responders must authorize
+OCSP signing and have a currently valid certificate. Issuers are selected by
+certificate relationships, not their position in the input. Missing issuers are
+not downloaded through AIA.
 
-### Example configuration
+`ThisUpdate` must be present and no more than five minutes in the future.
+`NextUpdate`, when present, must follow `ThisUpdate` and be later than the
+current time. Without `NextUpdate`, responses are accepted for at most 24 hours.
+Response bodies are bounded to 10 MiB for CRLs and 1 MiB for OCSP. Unsupported
+responses and missing issuer/responder information are uncertainty, not evidence
+that a certificate is unrevoked.
+
+### TLS probes
+
+`--tls-versions` probes TLS 1.0–1.3, including legacy-only endpoints. TLS 1.0–1.2
+cipher enumeration repeatedly removes the negotiated suite from the offered list.
+Results reflect observed negotiation order and cover only suites implemented by
+Go. TLS 1.3 reports only the negotiated cipher suite because Go does not permit
+configuring those suites individually.
+
+Cipher security categories follow Go's classification. Legacy protocol support
+does not change certificate trust status by itself, and a failed probe is not
+proof that the protocol is unsupported. An exhausted overall deadline produces a
+failure instead of a supposedly complete probe result.
+
+STARTTLS text reply lines and LDAP responses are bounded to 64 KiB. Malformed
+or unsuccessful upgrade replies are reported as connection failures.
+
+## Configuration
+
+Configuration is JSON at the OS-specific location:
+
+| Platform | Default path |
+| --- | --- |
+| Linux | `$XDG_CONFIG_HOME/tlsctl/settings.json` or `~/.config/tlsctl/settings.json` |
+| macOS | `~/Library/Application Support/tlsctl/settings.json` |
+| Windows | `%AppData%\tlsctl\settings.json` |
+
+Override the path with `--config PATH`. A missing default file is allowed; a
+missing explicitly selected file is an error. Precedence is explicit CLI flags,
+then the command section, then `global`, then built-in defaults.
 
 ```json
 {
   "global": {
-    "no-color": false,
-    "quiet": false,
-    "expiry-warning": 30,
-    "output": "json",
-    "cacert": "/etc/ssl/certs/ca.pem",
-    "connect-timeout": "5s",
-    "handshake-timeout": "10s",
-    "revocation": "ocsp",
-    "revocation-timeout": "10s",
-    "revocation-soft-fail": true
+    "expiry-warning": 21,
+    "no-color": true
   },
   "client": {
-    "quiet": true,
-    "expiry-warning": 21,
-    "format-version": 2,
-    "proxy": "http://proxy:8080",
-    "tls-versions": true,
-    "alpn": "h2,http/1.1",
-    "connect-timeout": "3s",
-    "handshake-timeout": "6s",
-    "revocation-soft-fail": false
+    "output": "json",
+    "concurrency": 8,
+    "timeout": "1m"
   },
   "pem": {
-    "expiry-warning": 7,
     "output": "yaml"
   }
 }
 ```
 
-The `global` section applies to all subcommands and supports: `no-color`, `quiet`, `expiry-warning`, `output`, `cacert`, `connect-timeout`, `handshake-timeout`, `revocation`, `revocation-timeout`, and `revocation-soft-fail`. The `client` section also supports `format-version`, `proxy`, `file`, `tls-versions`, `alpn`, `servername`, and `starttls` for client-specific behavior. Each subcommand section (`client`, `pem`) can override any global value with subcommand-specific settings. Only set the values you want to override — omitted keys inherit from `global` or use built-in defaults.
+Unknown keys, trailing JSON, and invalid values are rejected. Remove the old
+`format-version` setting when upgrading. Help, completion, and version reporting
+do not depend on certificate configuration. All supplied values are validated,
+including settings overridden by CLI flags. Explicit `false` flags override
+configured `true` values.
 
-Invalid JSON, unknown keys, and invalid values (e.g., out-of-range `expiry-warning`) produce clear error messages.
+Common settings in `global`, `client`, and `pem`:
 
-## Revocation checking
+| Key | Type | Default |
+| --- | --- | --- |
+| `no-color` | Boolean | Automatic terminal/environment detection |
+| `quiet` | Boolean | `false` |
+| `expiry-warning` | Integer, 1–10000 | `30` |
+| `output` | Format name | `human` |
+| `cacert` | PEM path | System trust |
+| `revocation` | `crl`, `ocsp`, or empty | Disabled |
+| `revocation-timeout` | Positive duration string | `5s` |
+| `revocation-soft-fail` | Boolean | `true` |
 
-Both `client` and `pem` subcommands support certificate revocation checking via the `--revocation` flag.
+Client-only settings:
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--revocation` | | Revocation check mode: `crl` or `ocsp` (disabled if not set) |
-| `--revocation-timeout` | `5s` | Timeout for revocation requests |
-| `--revocation-soft-fail` | `true` | Treat unreachable revocation endpoints as non-fatal |
+| Key | Type | Default |
+| --- | --- | --- |
+| `file` | Endpoint filename or `-` | None |
+| `proxy` | HTTP(S) URL | `HTTPS_PROXY` / `NO_PROXY` |
+| `tls-versions` | Boolean | `false` |
+| `alpn` | Comma-separated protocols | None |
+| `servername` | Verification/SNI hostname | Target hostname |
+| `starttls` | Protocol name | Disabled |
+| `concurrency` | Integer, 1–256 | `8` |
+| `timeout` | Positive duration string | `1m` |
+| `connect-timeout` | Positive duration string | `5s` |
+| `handshake-timeout` | Positive duration string | `10s` |
 
-```bash
-# CRL-based revocation check
-tlsctl client --revocation crl example.com
+`connect-timeout` and `handshake-timeout` may also be set in `global`, but only
+apply to `client`. PEM configuration rejects these connection-only keys.
 
-# OCSP-based revocation check
-tlsctl client --revocation ocsp example.com
+## Color and completion
 
-# Custom timeout for slow networks
-tlsctl client --revocation ocsp --revocation-timeout 10s example.com
-```
-
-## Certificate fields
-
-The tool extracts and displays the following X.509 certificate fields:
-
-| Field | Description |
-|-------|-------------|
-| Type | Leaf, intermediate, or root |
-| Version | X.509 certificate version |
-| Serial Number | Hex-formatted serial number |
-| Signature Algorithm | e.g., SHA256-RSA, ECDSA-SHA256 |
-| Issuer / Subject | Distinguished name (DN) |
-| Validity | Not Before / Not After in RFC 3339 format |
-| Public Key Algorithm | e.g., RSA, ECDSA |
-| Key Length | Public key size in bits (e.g., 2048, 4096, 256) |
-| Key Usage | Digital Signature, Key Encipherment, Certificate Sign, etc. |
-| Extended Key Usage | TLS Web Server Authentication, Client Authentication, etc. |
-| Basic Constraints | CA flag and path length |
-| Subject / Authority Key ID | Hex-formatted key identifiers |
-| Subject Alt Names | DNS names |
-| Email / IP Addresses | Additional identifiers |
-| OCSP / CA Issuers / CRL | Revocation and issuer endpoints |
-| Revocation Status | CRL or OCSP result (when `--revocation` is enabled) |
-| Fingerprint | SHA-1 and SHA-256 fingerprints |
-
-## Testing with badssl.com
-
-[badssl.com](https://badssl.com) provides various endpoints for testing TLS certificate scenarios. Here are some useful ones to try with `tlsctl`:
+Use `--no-color` or `NO_COLOR=1` to disable ANSI color. Color is also disabled
+automatically when stdout is not a terminal. Status words remain meaningful
+without color.
 
 ```bash
-# Valid certificate
-tlsctl client badssl.com
-
-# Expired certificate
-tlsctl client expired.badssl.com
-
-# Wrong hostname
-tlsctl client wrong.host.badssl.com
-
-# Self-signed certificate
-tlsctl client self-signed.badssl.com
-
-# Untrusted root CA
-tlsctl client untrusted-root.badssl.com
-
-# Incomplete certificate chain
-tlsctl client incomplete-chain.badssl.com
-
-# Revoked certificate (check via CRL)
-tlsctl client --revocation crl revoked.badssl.com
-
-# ECC certificate
-tlsctl client ecc256.badssl.com
+tlsctl completion bash > tlsctl.bash
+tlsctl completion zsh > _tlsctl
+tlsctl completion fish > tlsctl.fish
 ```
 
-## Shell completion
+Source the Bash script or install the generated file in your shell's completion
+directory. Output formats, revocation modes, and STARTTLS protocols have value
+completion.
 
-Generate autocompletion scripts for your shell:
+## Migrating from 1.x
+
+Version 2.0.0 removes structured format v1. Remove `--format-version` from commands
+and `format-version` from configuration; both are rejected rather than ignored.
+The former v2 contract is now the only structured format for both commands,
+including single endpoints and PEM input.
+
+For a successfully inspected single input, JSON/YAML paths change as follows:
+
+| Legacy path | 2.0.0 path |
+| --- | --- |
+| `.certificates` | `.results[0].result.certificates` |
+| `.verified` | `.results[0].result.verified` |
+| `.negotiated_tls` | `.results[0].result.negotiated_tls` |
+| `.verification_error` | `.results[0].result.verification_error` |
+
+For batches, iterate `.results[]`, select `.status == "success"`, and then access
+`.result`. The existing client v2 envelope is retained; PEM now uses it too.
+One PEM file or stdin is one result containing all its certificates.
+
+Both CSV modes begin with `target,status,tls_status,error`. PEM uses `target`
+instead of the old `source` header. Read columns by name, not old numeric positions.
+CSV-full still emits one row per certificate; failed inputs produce one error row.
+
+Soft-fail and hard-fail revocation handling have been corrected as described
+[above](#revocation-policy). Missing or malformed CA files and output-write failures
+return exit `1`. Invalid options are rejected even with `--quiet`. Exit-code
+numbers and precedence remain `1 > 3 > 2 > 4 > 0`.
+
+New client defaults are eight concurrent targets and a one-minute overall timeout
+per target. Existing connection-phase timeouts continue to apply. Human and text
+output identify the actual target/source, and expiry warnings use the exact
+threshold instead of a truncated day count.
+
+The Go module path is now `github.com/catay/tlsctl/v2`, with Go 1.26.8 or later
+required. Module-based installation after publication uses:
 
 ```bash
-# Bash
-tlsctl completion bash > /etc/bash_completion.d/tlsctl
-
-# Zsh
-tlsctl completion zsh > "${fpath[1]}/_tlsctl"
-
-# Fish
-tlsctl completion fish > ~/.config/fish/completions/tlsctl.fish
+go install github.com/catay/tlsctl/v2@v2.0.0
 ```
+
+Module-based installation uses development version metadata. Use release archives
+or `make build` when embedded release metadata is needed.
+
+## Development
+
+```bash
+make             # Formatting check, lint, race-enabled tests, and build
+make fmt         # Apply Go formatting
+make test        # Race-enabled tests
+make vuln        # Scan reachable Go vulnerabilities
+make release-local  # Build snapshot archives and images without publishing
+```
+
+The full `make` target requires `golangci-lint` v2.11 or later, built with a
+compatible Go toolchain. Snapshot releases additionally require GoReleaser v2
+and Docker with Buildx. Release workflows validate before tagging and can resume
+publication for a tag pointing at the same commit.
+
+The implementation and release use separate PRs. Merging implementation changes
+does not publish a release; the separately approved `chore: bump version to 2.0.0`
+PR updates `VERSION` and triggers release publication. The README's installation
+examples already target 2.0.0.
 
 ## License
 

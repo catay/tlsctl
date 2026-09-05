@@ -13,6 +13,14 @@ func TestNormalizeEndpoint(t *testing.T) {
 		wantError bool
 		errorMsg  string
 	}{
+		{name: "bracketed IPv6 without port", endpoint: "[::1]", want: "[::1]:443"},
+		{name: "IPv6 zone", endpoint: "[fe80::1%eth0]", want: "[fe80::1%eth0]:443"},
+		{name: "bracketed hostname", endpoint: "[example.com]:443", wantError: true},
+		{name: "bracketed IPv4", endpoint: "[127.0.0.1]", wantError: true},
+		{name: "unclosed bracket", endpoint: "[::1", wantError: true},
+		{name: "extra bracket", endpoint: "[::1]]:443", wantError: true},
+		{name: "malformed host port", endpoint: "example.com:443:1", wantError: true},
+		{name: "whitespace", endpoint: "example .com", wantError: true},
 		{
 			name:     "valid endpoint with port",
 			endpoint: "example.com:443",

@@ -1,6 +1,7 @@
 package tlsquery
 
 import (
+	"crypto/x509"
 	"time"
 
 	"github.com/catay/tlsctl/v2/internal/revocation"
@@ -51,7 +52,7 @@ type Fingerprint struct {
 // BasicConstraints holds CA constraint information.
 type BasicConstraints struct {
 	IsCA       bool `json:"is_ca" yaml:"is_ca"`
-	MaxPathLen int  `json:"max_path_len,omitempty" yaml:"max_path_len,omitempty"`
+	MaxPathLen int  `json:"max_path_len" yaml:"max_path_len"`
 }
 
 // TLSVersionInfo holds a TLS version and its supported cipher suites in server-preferred order.
@@ -71,6 +72,8 @@ type HandshakeInfo struct {
 
 // ChainInfo holds the full certificate chain.
 type ChainInfo struct {
+	parsed            []*x509.Certificate
+	issuer            *x509.Certificate
 	Certificates      []CertInfo       `json:"certificates" yaml:"certificates"`
 	Verified          bool             `json:"verified" yaml:"verified"`
 	VerificationError string           `json:"verification_error,omitempty" yaml:"verification_error,omitempty"`
@@ -82,12 +85,13 @@ type ChainInfo struct {
 
 // QueryOptions configures the TLS query behavior.
 type QueryOptions struct {
-	CACertFile       string        // Path to custom CA certificate file (PEM format)
-	Proxy            string        // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY/HTTP_PROXY env vars are used.
-	TLSVersions      bool          // Probe and display supported TLS versions.
-	ALPNProtocols    []string      // Advertised ALPN protocols for the TLS handshake.
-	ServerName       string        // SNI override for TLS handshake (useful when connecting by IP).
-	StartTLS         string        // STARTTLS protocol: smtp, imap, pop3, ldap.
-	ConnectTimeout   time.Duration // TCP connect timeout. Defaults to DefaultConnectTimeout when unset.
-	HandshakeTimeout time.Duration // Proxy negotiation, STARTTLS, and TLS handshake timeout. Defaults to DefaultHandshakeTimeout when unset.
+	RootCAs          *x509.CertPool // Optional immutable CA pool prepared once for a batch.
+	CACertFile       string         // Path to custom CA certificate file (PEM format)
+	Proxy            string         // Proxy URL (e.g. http://proxy:8080). If empty, HTTPS_PROXY and NO_PROXY environment settings are used.
+	TLSVersions      bool           // Probe and display supported TLS versions.
+	ALPNProtocols    []string       // Advertised ALPN protocols for the TLS handshake.
+	ServerName       string         // SNI override for TLS handshake (useful when connecting by IP).
+	StartTLS         string         // STARTTLS protocol: smtp, imap, pop3, ldap.
+	ConnectTimeout   time.Duration  // TCP connect timeout. Defaults to DefaultConnectTimeout when unset.
+	HandshakeTimeout time.Duration  // Proxy negotiation, STARTTLS, and TLS handshake timeout. Defaults to DefaultHandshakeTimeout when unset.
 }

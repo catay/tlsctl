@@ -195,6 +195,7 @@ func TestCertTypeFromCert(t *testing.T) {
 	block, _ := pem.Decode([]byte(testCACertPEM))
 	if block == nil {
 		t.Fatal("failed to decode PEM block")
+		return
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {

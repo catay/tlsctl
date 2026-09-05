@@ -13,13 +13,6 @@ import (
 )
 
 func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options, now time.Time) []Result {
-	if issuer == nil {
-		return []Result{{
-			Method: MethodOCSP,
-			Status: StatusNotChecked,
-			Error:  "no issuer certificate available",
-		}}
-	}
 
 	if len(leaf.OCSPServer) == 0 {
 		return []Result{{
@@ -29,32 +22,24 @@ func (c *Checker) checkOCSP(leaf, issuer *x509.Certificate, opts Options, now ti
 		}}
 	}
 
-	timeout := opts.Timeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
+	if err := ValidateIssuer(leaf, issuer); err != nil {
+		return []Result{{Method: MethodOCSP, Status: StatusNotChecked, Error: err.Error()}}
 	}
-
+	var results []Result
 	for _, responderURL := range leaf.OCSPServer {
-		result := c.fetchAndCheckOCSP(leaf, issuer, responderURL, timeout, now)
+		result := c.fetchAndCheckOCSP(opts.Context, leaf, issuer, responderURL, opts.Timeout, now)
+		results = append(results, result)
 		if result.Status == StatusGood || result.Status == StatusRevoked {
-			return []Result{result}
+			break
 		}
-		if result.Status == StatusError || result.Status == StatusUnknown {
-			if opts.SoftFail {
-				return []Result{result}
-			}
-			continue
+		if opts.Context.Err() != nil {
+			break
 		}
 	}
-
-	return []Result{{
-		Method: MethodOCSP,
-		Status: StatusUnknown,
-		Error:  "all OCSP responders failed",
-	}}
+	return results
 }
 
-func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL string, timeout time.Duration, now time.Time) Result {
+func (c *Checker) fetchAndCheckOCSP(parent context.Context, leaf, issuer *x509.Certificate, responderURL string, timeout time.Duration, now time.Time) Result {
 	ocspReq, err := ocsp.CreateRequest(leaf, issuer, nil)
 	if err != nil {
 		return Result{
@@ -65,7 +50,7 @@ func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, responderURL, bytes.NewReader(ocspReq))
@@ -119,12 +104,24 @@ func (c *Checker) fetchAndCheckOCSP(leaf, issuer *x509.Certificate, responderURL
 		}
 	}
 
-	if now.After(ocspResp.NextUpdate) && !ocspResp.NextUpdate.IsZero() {
+	if responder := ocspResp.Certificate; responder != nil && !bytes.Equal(responder.Raw, issuer.Raw) {
+		authorized := false
+		for _, usage := range responder.ExtKeyUsage {
+			if usage == x509.ExtKeyUsageOCSPSigning {
+				authorized = true
+			}
+		}
+		if !authorized || len(responder.UnhandledCriticalExtensions) != 0 || now.Before(responder.NotBefore) || now.After(responder.NotAfter) ||
+			(responder.KeyUsage != 0 && responder.KeyUsage&x509.KeyUsageDigitalSignature == 0) {
+			return Result{Method: MethodOCSP, Status: StatusError, ResponderURL: responderURL, Error: "OCSP responder certificate is not authorized or is outside its validity period"}
+		}
+	}
+	if err := checkFreshness(ocspResp.ThisUpdate, ocspResp.NextUpdate, now, "OCSP response"); err != nil {
 		return Result{
 			Method:       MethodOCSP,
 			Status:       StatusUnknown,
 			ResponderURL: responderURL,
-			Error:        "stale OCSP response: past NextUpdate time",
+			Error:        err.Error(),
 		}
 	}
 

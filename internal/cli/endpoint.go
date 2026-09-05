@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -18,11 +19,33 @@ func NormalizeEndpoint(endpoint string, startTLSProto ...string) (string, error)
 	}
 
 	host, port, err := net.SplitHostPort(endpoint)
+	if err == nil && strings.HasPrefix(endpoint, "[") {
+		if ip, parseErr := netip.ParseAddr(host); parseErr != nil || !ip.Is6() {
+			return "", fmt.Errorf("brackets require an IPv6 address")
+		}
+	}
 	if err != nil {
 		host = endpoint
 		port = ""
+		if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+			host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+			if ip, err := netip.ParseAddr(host); err != nil || !ip.Is6() {
+				return "", fmt.Errorf("brackets require an IPv6 address")
+			}
+		}
+		if _, err := netip.ParseAddr(host); strings.ContainsAny(host, "[]:%") && err != nil {
+			return "", fmt.Errorf("invalid host or port: %s", endpoint)
+		}
+	}
+	if strings.ContainsAny(host, ":[]%") {
+		if _, err := netip.ParseAddr(host); err != nil {
+			return "", fmt.Errorf("invalid IP address: %s", host)
+		}
 	}
 
+	if strings.ContainsAny(host, " \t\r\n") {
+		return "", fmt.Errorf("invalid hostname: whitespace is not allowed")
+	}
 	if host == "" {
 		return "", fmt.Errorf("invalid hostname: hostname cannot be empty")
 	}

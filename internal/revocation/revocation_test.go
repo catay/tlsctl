@@ -180,7 +180,7 @@ func TestCheckCRL_NotRevoked(t *testing.T) {
 	leaf, _ := newLeaf(t, ca, caKey, []string{srv.URL})
 
 	checker := NewChecker(srv.Client(), time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}, SoftFail: true})
 
 	if info.OverallStatus != StatusGood {
 		t.Errorf("expected overall status %q, got %q", StatusGood, info.OverallStatus)
@@ -210,7 +210,7 @@ func TestCheckCRL_Revoked(t *testing.T) {
 	leaf, _ := newLeaf(t, ca, caKey, []string{srv.URL})
 
 	checker := NewChecker(srv.Client(), time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}, SoftFail: true})
 
 	if info.OverallStatus != StatusRevoked {
 		t.Errorf("expected overall status %q, got %q", StatusRevoked, info.OverallStatus)
@@ -235,7 +235,7 @@ func TestCheckCRL_NoCRLDistributionPoints(t *testing.T) {
 	leaf, _ := newLeaf(t, ca, caKey, nil)
 
 	checker := NewChecker(http.DefaultClient, time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodCRL}, SoftFail: true})
 
 	if info.OverallStatus != StatusNotSupported {
 		t.Errorf("expected overall status %q, got %q", StatusNotSupported, info.OverallStatus)
@@ -259,8 +259,8 @@ func TestCheckCRL_FetchError(t *testing.T) {
 		Timeout:  500 * time.Millisecond,
 	})
 
-	if info.OverallStatus != StatusError {
-		t.Errorf("expected overall status %q, got %q", StatusError, info.OverallStatus)
+	if info.OverallStatus != StatusUnknown {
+		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))
@@ -402,7 +402,7 @@ func TestCheckOCSP_NotRevoked(t *testing.T) {
 	leaf, _ = newLeafWithOCSP(t, ca, caKey, []string{srv.URL})
 
 	checker := NewChecker(srv.Client(), time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}, SoftFail: true})
 
 	if info.OverallStatus != StatusGood {
 		t.Errorf("expected overall status %q, got %q", StatusGood, info.OverallStatus)
@@ -433,7 +433,7 @@ func TestCheckOCSP_Revoked(t *testing.T) {
 	leaf, _ = newLeafWithOCSP(t, ca, caKey, []string{srv.URL})
 
 	checker := NewChecker(srv.Client(), time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}, SoftFail: true})
 
 	if info.OverallStatus != StatusRevoked {
 		t.Errorf("expected overall status %q, got %q", StatusRevoked, info.OverallStatus)
@@ -458,7 +458,7 @@ func TestCheckOCSP_NoOCSPServer(t *testing.T) {
 	leaf, _ := newLeafWithOCSP(t, ca, caKey, nil)
 
 	checker := NewChecker(http.DefaultClient, time.Now)
-	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}})
+	info := checker.CheckCert(leaf, ca, Options{Methods: []Method{MethodOCSP}, SoftFail: true})
 
 	if info.OverallStatus != StatusNotSupported {
 		t.Errorf("expected overall status %q, got %q", StatusNotSupported, info.OverallStatus)
@@ -476,7 +476,7 @@ func TestCheckOCSP_NoIssuer(t *testing.T) {
 	leaf, _ := newLeafWithOCSP(t, ca, caKey, []string{"http://ocsp.example.com"})
 
 	checker := NewChecker(http.DefaultClient, time.Now)
-	info := checker.CheckCert(leaf, nil, Options{Methods: []Method{MethodOCSP}})
+	info := checker.CheckCert(leaf, nil, Options{Methods: []Method{MethodOCSP}, SoftFail: true})
 
 	if info.OverallStatus != StatusUnknown {
 		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
@@ -500,8 +500,8 @@ func TestCheckOCSP_FetchError(t *testing.T) {
 		Timeout:  500 * time.Millisecond,
 	})
 
-	if info.OverallStatus != StatusError {
-		t.Errorf("expected overall status %q, got %q", StatusError, info.OverallStatus)
+	if info.OverallStatus != StatusUnknown {
+		t.Errorf("expected overall status %q, got %q", StatusUnknown, info.OverallStatus)
 	}
 	if len(info.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(info.Results))

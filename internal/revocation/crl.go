@@ -1,6 +1,7 @@
 package revocation
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"fmt"
@@ -18,33 +19,25 @@ func (c *Checker) checkCRL(leaf, issuer *x509.Certificate, opts Options, now tim
 		}}
 	}
 
-	timeout := opts.Timeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
+	if err := ValidateIssuer(leaf, issuer); err != nil {
+		return []Result{{Method: MethodCRL, Status: StatusNotChecked, Error: err.Error()}}
 	}
-
+	var results []Result
 	for _, dp := range leaf.CRLDistributionPoints {
-		result := c.fetchAndCheckCRL(leaf, issuer, dp, timeout, now)
+		result := c.fetchAndCheckCRL(opts.Context, leaf, issuer, dp, opts.Timeout, now)
+		results = append(results, result)
 		if result.Status == StatusGood || result.Status == StatusRevoked {
-			return []Result{result}
+			break
 		}
-		if result.Status == StatusError || result.Status == StatusUnknown {
-			if opts.SoftFail {
-				return []Result{result}
-			}
-			continue
+		if opts.Context.Err() != nil {
+			break
 		}
 	}
-
-	return []Result{{
-		Method: MethodCRL,
-		Status: StatusUnknown,
-		Error:  "all CRL distribution points failed",
-	}}
+	return results
 }
 
-func (c *Checker) fetchAndCheckCRL(leaf, issuer *x509.Certificate, dpURL string, timeout time.Duration, now time.Time) Result {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func (c *Checker) fetchAndCheckCRL(parent context.Context, leaf, issuer *x509.Certificate, dpURL string, timeout time.Duration, now time.Time) Result {
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dpURL, nil)
@@ -97,27 +90,38 @@ func (c *Checker) fetchAndCheckCRL(leaf, issuer *x509.Certificate, dpURL string,
 		}
 	}
 
-	if issuer != nil {
-		if err := crl.CheckSignatureFrom(issuer); err != nil {
-			return Result{
-				Method:       MethodCRL,
-				Status:       StatusError,
-				ResponderURL: dpURL,
-				Error:        fmt.Sprintf("CRL signature verification failed: %v", err),
-			}
+	if issuer == nil || !bytes.Equal(crl.RawIssuer, issuer.RawSubject) {
+		return Result{Method: MethodCRL, Status: StatusError, ResponderURL: dpURL, Error: "CRL issuer does not match certificate issuer"}
+	}
+	for _, ext := range crl.Extensions {
+		if ext.Critical {
+			return Result{Method: MethodCRL, Status: StatusError, ResponderURL: dpURL, Error: "unsupported critical CRL extension"}
+		}
+	}
+	if err := crl.CheckSignatureFrom(issuer); err != nil {
+		return Result{
+			Method:       MethodCRL,
+			Status:       StatusError,
+			ResponderURL: dpURL,
+			Error:        fmt.Sprintf("CRL signature verification failed: %v", err),
 		}
 	}
 
-	if now.After(crl.NextUpdate) && !crl.NextUpdate.IsZero() {
+	if err := checkFreshness(crl.ThisUpdate, crl.NextUpdate, now, "CRL"); err != nil {
 		return Result{
 			Method:       MethodCRL,
 			Status:       StatusUnknown,
 			ResponderURL: dpURL,
-			Error:        "stale CRL: past NextUpdate time",
+			Error:        err.Error(),
 		}
 	}
 
 	for _, entry := range crl.RevokedCertificateEntries {
+		for _, ext := range entry.Extensions {
+			if ext.Critical {
+				return Result{Method: MethodCRL, Status: StatusError, ResponderURL: dpURL, Error: "unsupported critical CRL entry extension"}
+			}
+		}
 		if entry.SerialNumber.Cmp(leaf.SerialNumber) == 0 {
 			revokedAt := entry.RevocationTime
 			return Result{

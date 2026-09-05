@@ -20,9 +20,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/catay/tlsctl/cmd.version={{.Version}}
-      - -X github.com/catay/tlsctl/cmd.commit={{.ShortCommit}}
-      - -X github.com/catay/tlsctl/cmd.date={{.Date}}
+      - -X github.com/catay/tlsctl/v2/cmd.version={{.Version}}
+      - -X github.com/catay/tlsctl/v2/cmd.commit={{.ShortCommit}}
+      - -X github.com/catay/tlsctl/v2/cmd.date={{.Date}}
 
 archives:
   - formats: ['tar.gz']

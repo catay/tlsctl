@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 // NormalizeEndpoint parses and normalizes a host or host:port endpoint.

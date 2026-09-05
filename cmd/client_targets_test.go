@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catay/tlsctl/internal/output"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/output"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 func TestCollectTargets(t *testing.T) {

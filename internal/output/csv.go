@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 )
 
 type CSVRenderer struct{}

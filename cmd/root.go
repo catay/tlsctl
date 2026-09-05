@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/catay/tlsctl/internal/config"
+	"github.com/catay/tlsctl/v2/internal/config"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

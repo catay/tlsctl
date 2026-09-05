@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catay/tlsctl/internal/revocation"
-	"github.com/catay/tlsctl/internal/tlsquery"
+	"github.com/catay/tlsctl/v2/internal/revocation"
+	"github.com/catay/tlsctl/v2/internal/tlsquery"
 	"github.com/fatih/color"
 )
 

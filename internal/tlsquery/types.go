@@ -3,7 +3,7 @@ package tlsquery
 import (
 	"time"
 
-	"github.com/catay/tlsctl/internal/revocation"
+	"github.com/catay/tlsctl/v2/internal/revocation"
 )
 
 const (
